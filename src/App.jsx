@@ -223,6 +223,31 @@ export function App() {
     setActivePage("home");
   };
 
+  const handleSaveProfile = (profileData) => {
+    setSession((prev) => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        name: profileData.name,
+      };
+    });
+    
+    // Dynamically apply visual theme variables
+    const root = document.documentElement;
+    if (profileData.theme === "dark") {
+      root.style.setProperty("--petrol", "#021c1d");
+      root.style.setProperty("--petrol-light", "#164c4e");
+    } else if (profileData.theme === "warm") {
+      root.style.setProperty("--petrol", "#332c25");
+      root.style.setProperty("--petrol-light", "#5e5246");
+    } else {
+      // default petrol
+      root.style.setProperty("--petrol", "#083c3e");
+      root.style.setProperty("--petrol-light", "#153f40");
+    }
+    setToast("Profile updated");
+  };
+
   // ─── Render ────────────────────────────────────────────────────────────────
   if (authLoading) {
     return (
@@ -233,7 +258,9 @@ export function App() {
     );
   }
 
-  if (!session) return <WelcomeScreen onEnter={enterDemo} />;
+  if (!session || activePage === "landing") {
+    return <WelcomeScreen session={session} onEnter={enterDemo} onNavigateToApp={() => setActivePage("home")} />;
+  }
 
   return (
     <>
@@ -243,6 +270,7 @@ export function App() {
         memories={visibleMemories}
         reminders={reminders}
         onNavigate={setActivePage}
+        onSaveProfile={handleSaveProfile}
         onCapture={() => setCaptureOpen(true)}
         onSearch={() => setSearchOpen(true)}
         onAsk={() => setAskOpen(true)}

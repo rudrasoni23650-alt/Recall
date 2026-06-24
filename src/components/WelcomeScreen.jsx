@@ -48,7 +48,7 @@ const faqs = [
   ["Can I bring screenshots and recordings?", "Yes. Capture supports files, links, images, notes, reminders, and browser voice recording where the browser permits it."],
 ];
 
-export function WelcomeScreen({ onEnter }) {
+export function WelcomeScreen({ session, onEnter, onNavigateToApp }) {
   const { scrollYProgress } = useScroll();
   const yParallaxFast = useTransform(scrollYProgress, [0, 1], [0, -120]);
   const yParallaxSlow = useTransform(scrollYProgress, [0, 1], [0, -60]);
@@ -58,6 +58,13 @@ export function WelcomeScreen({ onEnter }) {
   const [authMode, setAuthMode] = useState(null);
   const [openFaq, setOpenFaq] = useState(0);
   const [openPrinciple, setOpenPrinciple] = useState(0);
+  const [welcomeDropdownOpen, setWelcomeDropdownOpen] = useState(false);
+
+  const initials = session?.name 
+    ? session.name.slice(0, 2).toUpperCase() 
+    : session?.user?.email 
+      ? session.user.email.slice(0, 2).toUpperCase() 
+      : "DU";
 
   // Listen for App.jsx to signal that anonymous auth failed → open real auth modal
   useEffect(() => {
@@ -112,8 +119,105 @@ export function WelcomeScreen({ onEnter }) {
               <a href="#faq">FAQ</a>
             </div>
             <div className="welcome-account-actions">
-              <motion.button whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.95 }} className="secondary-button" type="button" onClick={() => setAuthMode("signin")}>Sign in</motion.button>
-              <motion.button whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.95 }} className="primary-button" type="button" onClick={() => setAuthMode("create")}>Create your space</motion.button>
+              {session ? (
+                <div style={{ position: "relative" }}>
+                  <motion.button 
+                    whileHover={{ scale: 1.05 }} 
+                    whileTap={{ scale: 0.95 }} 
+                    onClick={() => setWelcomeDropdownOpen(!welcomeDropdownOpen)}
+                    style={{
+                      width: "40px",
+                      height: "40px",
+                      borderRadius: "50%",
+                      background: "rgba(255, 255, 255, 0.15)",
+                      color: "#fff",
+                      display: "grid",
+                      placeItems: "center",
+                      fontWeight: "600",
+                      cursor: "pointer",
+                      border: "1px solid rgba(255,255,255,0.35)",
+                      fontSize: "13px",
+                      backdropFilter: "blur(10px)",
+                      WebkitBackdropFilter: "blur(10px)"
+                    }}
+                  >
+                    {initials}
+                  </motion.button>
+                  {welcomeDropdownOpen && (
+                    <div 
+                      className="welcome-profile-dropdown" 
+                      style={{
+                        position: "absolute",
+                        top: "48px",
+                        right: "0",
+                        background: "rgba(255, 255, 255, 0.92)",
+                        border: "1px solid rgba(21,63,64,0.15)",
+                        borderRadius: "12px",
+                        boxShadow: "0 10px 30px rgba(8,60,62,0.15)",
+                        padding: "6px",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "2px",
+                        minWidth: "160px",
+                        zIndex: 1000,
+                        backdropFilter: "blur(8px)",
+                        WebkitBackdropFilter: "blur(8px)"
+                      }}
+                    >
+                      <button 
+                        onClick={() => { setWelcomeDropdownOpen(false); onNavigateToApp(); }}
+                        style={{
+                          background: "none",
+                          border: "0",
+                          padding: "8px 12px",
+                          textAlign: "left",
+                          fontSize: "13px",
+                          fontWeight: "600",
+                          cursor: "pointer",
+                          borderRadius: "6px",
+                          color: "var(--petrol)",
+                          display: "block",
+                          width: "100%"
+                        }}
+                        onMouseEnter={(e) => e.target.style.background = "rgba(21, 63, 64, 0.05)"}
+                        onMouseLeave={(e) => e.target.style.background = "none"}
+                      >
+                        Enter Workspace
+                      </button>
+                      <button 
+                        onClick={async () => {
+                          setWelcomeDropdownOpen(false);
+                          const { supabase } = await import("../lib/supabase.js");
+                          await supabase.auth.signOut();
+                          window.location.reload();
+                        }}
+                        style={{
+                          background: "none",
+                          border: "0",
+                          padding: "8px 12px",
+                          textAlign: "left",
+                          fontSize: "13px",
+                          fontWeight: "600",
+                          cursor: "pointer",
+                          borderRadius: "6px",
+                          color: "#ef4444",
+                          display: "block",
+                          width: "100%"
+                        }}
+                        onMouseEnter={(e) => e.target.style.background = "rgba(239, 68, 68, 0.05)"}
+                        onMouseLeave={(e) => e.target.style.background = "none"}
+                      >
+                        Sign Out
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <motion.button whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.95 }} className="secondary-button" type="button" onClick={() => setAuthMode("signin")}>Sign in</motion.button>
+                  <motion.button whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.95 }} className="primary-button" type="button" onClick={() => setAuthMode("create")}>Create your space</motion.button>
+                </>
+              )}
             </div>
           </nav>
 

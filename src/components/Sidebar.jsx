@@ -29,7 +29,13 @@ export function Sidebar({ session, activePage, onNavigate, onAsk, profileOpen, o
       </div>
       <div className="profile-wrap">
         <span className="sidebar-label sidebar-label--account">Your space</span>
-        {profileOpen ? <div className="profile-menu"><button type="button" onClick={onSignOut}>Return to welcome screen</button><button type="button" onClick={() => { localStorage.removeItem("recall-state-v1"); window.location.reload(); }}>Reset local demo</button></div> : null}
+        {profileOpen ? (
+          <div className="profile-menu">
+            <button type="button" onClick={() => { onToggleProfile(); onNavigate("profile"); }}>Settings & Profile</button>
+            <button type="button" onClick={() => { onToggleProfile(); onNavigate("landing"); }}>View landing page</button>
+            <button type="button" onClick={onSignOut}>Sign out</button>
+          </div>
+        ) : null}
         <motion.button className="profile-button" whileHover={{ scale: 1.02, y: -2 }} whileTap={{ scale: 0.96 }} transition={{ type: "spring", stiffness: 300, damping: 14 }} type="button" onClick={onToggleProfile} aria-expanded={profileOpen}>
           <span className="avatar">{session.name ? session.name.slice(0,2).toUpperCase() : session.user?.email ? session.user.email.slice(0,2).toUpperCase() : "DU"}</span><span><strong>{session.name || session.user?.email || "Demo User"}</strong><small>Local & private</small></span><CaretDown />
         </motion.button>

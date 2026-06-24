@@ -7,9 +7,10 @@ import { HomePage } from "./pages/HomePage.jsx";
 import { MemoriesPage } from "./pages/MemoriesPage.jsx";
 import { SpacesPage } from "./pages/SpacesPage.jsx";
 import { RemindersPage } from "./pages/RemindersPage.jsx";
+import { ProfilePage } from "./pages/ProfilePage.jsx";
 import { MemoryCard } from "./MemoryCard.jsx";
 
-const pageComponents = { home: HomePage, memories: MemoriesPage, spaces: SpacesPage, reminders: RemindersPage };
+const pageComponents = { home: HomePage, memories: MemoriesPage, spaces: SpacesPage, reminders: RemindersPage, profile: ProfilePage };
 
 export function Workspace(props) {
   const [profileOpen, setProfileOpen] = useState(false);
