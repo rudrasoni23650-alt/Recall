@@ -31,7 +31,8 @@ export function Sidebar({ session, activePage, onNavigate, onAsk, profileOpen, o
         <span className="sidebar-label sidebar-label--account">Your space</span>
         {profileOpen ? (
           <div className="profile-menu">
-            <button type="button" onClick={() => { onToggleProfile(); onNavigate("profile"); }}>Settings & Profile</button>
+            <button type="button" onClick={() => { onToggleProfile(); onNavigate("profile"); }}>Profile & Theme</button>
+            <button type="button" onClick={() => { onToggleProfile(); onNavigate("account"); }}>Account & Security</button>
             <button type="button" onClick={() => { onToggleProfile(); onNavigate("landing"); }}>View landing page</button>
             <button type="button" onClick={onSignOut}>Sign out</button>
           </div>

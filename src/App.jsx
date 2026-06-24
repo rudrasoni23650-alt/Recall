@@ -259,7 +259,7 @@ export function App() {
   }
 
   if (!session || activePage === "landing") {
-    return <WelcomeScreen session={session} onEnter={enterDemo} onNavigateToApp={() => setActivePage("home")} />;
+    return <WelcomeScreen session={session} onEnter={enterDemo} onNavigateToApp={(page) => setActivePage(page || "home")} />;
   }
 
   return (

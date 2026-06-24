@@ -165,7 +165,7 @@ export function WelcomeScreen({ session, onEnter, onNavigateToApp }) {
                       }}
                     >
                       <button 
-                        onClick={() => { setWelcomeDropdownOpen(false); onNavigateToApp(); }}
+                        onClick={() => { setWelcomeDropdownOpen(false); onNavigateToApp("home"); }}
                         style={{
                           background: "none",
                           border: "0",
@@ -183,6 +183,26 @@ export function WelcomeScreen({ session, onEnter, onNavigateToApp }) {
                         onMouseLeave={(e) => e.target.style.background = "none"}
                       >
                         Enter Workspace
+                      </button>
+                      <button 
+                        onClick={() => { setWelcomeDropdownOpen(false); onNavigateToApp("account"); }}
+                        style={{
+                          background: "none",
+                          border: "0",
+                          padding: "8px 12px",
+                          textAlign: "left",
+                          fontSize: "13px",
+                          fontWeight: "600",
+                          cursor: "pointer",
+                          borderRadius: "6px",
+                          color: "var(--petrol)",
+                          display: "block",
+                          width: "100%"
+                        }}
+                        onMouseEnter={(e) => e.target.style.background = "rgba(21, 63, 64, 0.05)"}
+                        onMouseLeave={(e) => e.target.style.background = "none"}
+                      >
+                        Account Settings
                       </button>
                       <button 
                         onClick={async () => {
