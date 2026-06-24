@@ -122,7 +122,7 @@ export function WelcomeScreen({ onEnter }) {
                 <motion.h1 variants={{ hidden: { opacity: 0, y: 60, scale: 0.92, rotateX: 10 }, visible: { opacity: 1, y: 0, scale: 1, rotateX: 0, transition: popularSpring } }}>A private space for everything worth remembering.</motion.h1>
                 <motion.p variants={{ hidden: { opacity: 0, y: 60, scale: 0.92, rotateX: 10 }, visible: { opacity: 1, y: 0, scale: 1, rotateX: 0, transition: popularSpring } }}>Notes, links, images, recordings, and useful fragments can live together without becoming another system to maintain.</motion.p>
                 <motion.div className="hero-actions" variants={{ hidden: { opacity: 0, y: 60, scale: 0.92, rotateX: 10 }, visible: { opacity: 1, y: 0, scale: 1, rotateX: 0, transition: popularSpring } }}>
-                  <motion.button whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.95 }} className="primary-button" type="button" onClick={() => onEnter("demo")}>Explore the space <ArrowRight weight="bold" /></motion.button>
+                  <motion.button whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.95 }} className="primary-button" type="button" onClick={() => onEnter("demo")}>Explore the demo <ArrowRight weight="bold" /></motion.button>
                   <motion.button whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.95 }} className="secondary-button" type="button" onClick={() => setAuthMode("create")}>Create yours</motion.button>
                 </motion.div>
               

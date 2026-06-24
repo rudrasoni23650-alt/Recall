@@ -2962,3 +2962,120 @@ html {
   width: 75%;
 }
 
+/* ─── Onboarding Tour Modal (Demo Sandbox) ────────────────────────────────── */
+.tour-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  background: rgba(8, 51, 52, 0.55);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.tour-modal {
+  width: min(540px, calc(100vw - 32px));
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(21, 63, 64, 0.15);
+  border-radius: 24px;
+  box-shadow: 0 20px 48px rgba(8, 60, 62, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+}
+
+.tour-close {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  color: var(--muted);
+  transition: color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tour-close:hover {
+  color: var(--ink);
+}
+
+.tour-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: #fdf0cd;
+  color: #bd8607;
+  display: grid;
+  place-items: center;
+  margin-bottom: 24px;
+  font-size: 24px;
+}
+
+.tour-slide h2 {
+  font: 400 clamp(32px, 3vw, 38px)/1.08 var(--display);
+  letter-spacing: -.03em;
+  margin: 0 0 10px;
+  color: var(--ink);
+}
+
+.tour-slide h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--petrol-light);
+  margin: 0 0 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tour-slide p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--muted);
+  margin: 0;
+  max-width: 44ch;
+}
+
+.tour-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 36px;
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+}
+
+.tour-dots {
+  display: flex;
+  gap: 8px;
+}
+
+.tour-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(21, 63, 64, 0.15);
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  transition: all 0.25s;
+}
+
+.tour-dot.is-active {
+  width: 20px;
+  border-radius: 4px;
+  background: var(--coral-deep);
+}
+
+.tour-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+

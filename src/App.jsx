@@ -7,6 +7,7 @@ import { CommandPalette } from "./components/CommandPalette.jsx";
 import { MemoryDrawer } from "./components/MemoryDrawer.jsx";
 import { AskPanel } from "./components/AskPanel.jsx";
 import { supabase } from "./lib/supabase.js";
+import { DemoTourModal } from "./components/DemoTourModal.jsx";
 
 // ─── API helper: attaches Supabase JWT to every request ──────────────────────
 async function apiFetch(path, options = {}) {
@@ -36,6 +37,7 @@ export function App() {
   const [selectedMemory, setSelectedMemory] = useState(null);
   const [toast, setToast] = useState("");
   const [authLoading, setAuthLoading] = useState(true);
+  const [showTour, setShowTour] = useState(false);
 
   // ─── Supabase Auth state listener ──────────────────────────────────────────
   useEffect(() => {
@@ -115,7 +117,17 @@ export function App() {
    * isn't enabled, fall back to dispatching an event that opens the auth modal.
    */
   const enterDemo = async (mode) => {
-    if (mode === "demo" || mode === "empty") {
+    if (mode === "demo") {
+      setSession({ user: { email: "explore@recall.ai", id: "demo-user" }, name: "Demo User", isDemo: true });
+      setShowTour(true);
+      // Use setTimeout to ensure the session state is applied before calling loadState
+      setTimeout(() => {
+        loadState();
+      }, 0);
+      setActivePage("home");
+      return;
+    }
+    if (mode === "empty") {
       const { supabase } = await import("./lib/supabase.js");
       const { error } = await supabase.auth.signInAnonymously();
       if (error) {
@@ -207,6 +219,7 @@ export function App() {
     setSession(null);
     setMemories([]);
     setReminders([]);
+    setShowTour(false);
     setActivePage("home");
   };
 
@@ -262,6 +275,9 @@ export function App() {
             onSelectMemory={setSelectedMemory}
             onClose={() => setAskOpen(false)}
           />
+        ) : null}
+        {showTour ? (
+          <DemoTourModal onClose={() => setShowTour(false)} />
         ) : null}
       </AnimatePresence>
       {toast ? <div className="toast" role="status">{toast}</div> : null}
