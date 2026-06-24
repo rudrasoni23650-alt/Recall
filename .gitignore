@@ -1,0 +1,14 @@
+.DS_Store
+.env
+.env.*
+.npm-cache/
+.pnpm-store/
+node_modules/
+dist/
+node-v*-darwin-arm64/
+*.zip
+*.tar.gz
+*.backup
+*.bak
+.venv/
+.vscode/

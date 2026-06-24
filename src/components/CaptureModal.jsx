@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { motion } from "motion/react";
 import { Bell, FileArrowUp, FileText, Image, Link, Microphone, Sparkle, Stop, X } from "@phosphor-icons/react";
 
 const types = [
@@ -93,5 +94,110 @@ export function CaptureModal({ onClose, onSave }) {
     }), 780);
   };
 
-  return <div className="overlay" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><section className="modal capture-modal" role="dialog" aria-modal="true" aria-labelledby="capture-title"><header><div><span>Quick capture</span><h2 id="capture-title">What should come back later?</h2></div><button className="icon-button" onClick={onClose} aria-label="Close capture"><X /></button></header><div className="capture-types">{types.map(({ id, label, icon: Icon }) => <button className={type === id ? "is-active" : ""} key={id} onClick={() => changeType(id)}><Icon weight="duotone" />{label}</button>)}</div><div className="capture-fields">{type !== "voice" && type !== "image" ? <label className="capture-main-field">{type === "link" ? "Web address" : type === "reminder" ? "What should we remind you about?" : "Your thought"}{type === "note" ? <textarea autoFocus placeholder="Write without organizing…" value={text} onChange={(event) => setText(event.target.value)} /> : <input autoFocus type={type === "link" ? "url" : "text"} placeholder={type === "link" ? "https://example.com/article" : "Follow up on the launch narrative"} value={text} onChange={(event) => { setText(event.target.value); setError(""); }} />}</label> : null}{type === "image" ? <label className={file ? "drop-zone has-file" : "drop-zone"} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); setFile(event.dataTransfer.files[0] ?? null); }}><input type="file" accept="image/*,.pdf,.txt,.md" onChange={(event) => setFile(event.target.files[0] ?? null)} /><FileArrowUp weight="duotone" /><strong>{file ? file.name : "Drop a file here"}</strong><span>{file ? `${Math.max(1, Math.round(file.size / 1024))} KB · Ready to save` : "or click to choose an image, PDF, or document"}</span></label> : null}{type === "voice" ? <div className={recording ? "recorder is-recording" : "recorder"}><button onClick={recording ? stopRecording : startRecording}>{recording ? <Stop weight="fill" /> : <Microphone weight="fill" />}</button><div><strong>{recording ? `Recording ${formattedElapsed}` : audioUrl ? "Recording ready" : "Ready to record"}</strong><span>{recording ? "Tap stop when the thought is complete." : audioUrl ? "Listen back before saving." : "Your browser will ask for microphone access."}</span></div><div className="wave-bars" aria-hidden="true">{Array.from({ length: 18 }, (_, index) => <i key={index} />)}</div>{audioUrl ? <audio controls src={audioUrl} /> : null}</div> : null}{type === "reminder" ? <div className="reminder-fields"><label>When<select value={due} onChange={(event) => setDue(event.target.value)}><option>Today</option><option>Tomorrow</option><option>Next week</option></select></label><label>Time<input value={time} onChange={(event) => setTime(event.target.value)} placeholder="9:00 AM" /></label></div> : null}{type !== "reminder" ? <label className="optional-title">Title <span>optional</span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Second Signal can create one for you" /></label> : null}</div>{error ? <p className="capture-error" role="alert">{error}</p> : null}<div className="capture-insight"><Sparkle weight="fill" /><span><strong>Second Signal will organize this.</strong> It will suggest a title, summary, related memories, and any useful next step.</span></div><footer><span>{processing ? "Understanding your capture…" : "Saved locally in this browser"}</span><button className="primary-button" onClick={save} disabled={processing}>{processing ? "Organizing…" : type === "reminder" ? "Create reminder" : "Save memory"}</button></footer></section></div>;
+  return (
+    <motion.div
+      className="overlay"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      role="presentation"
+      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+    >
+      <motion.section
+        className="modal capture-modal"
+        initial={{ scale: 0.94, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.94, opacity: 0, y: 20 }}
+        transition={{ type: "spring", stiffness: 400, damping: 24 }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="capture-title"
+      >
+        <header>
+          <div>
+            <span>Quick capture</span>
+            <h2 id="capture-title">What should come back later?</h2>
+          </div>
+          <button className="icon-button" onClick={onClose} aria-label="Close capture"><X /></button>
+        </header>
+        <div className="capture-types">
+          {types.map(({ id, label, icon: Icon }) => (
+            <button className={type === id ? "is-active" : ""} key={id} onClick={() => changeType(id)}>
+              <Icon weight="duotone" />
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="capture-fields">
+          {type !== "voice" && type !== "image" ? (
+            <label className="capture-main-field">
+              {type === "link" ? "Web address" : type === "reminder" ? "What should we remind you about?" : "Your thought"}
+              {type === "note" ? (
+                <textarea autoFocus placeholder="Write without organizing…" value={text} onChange={(event) => setText(event.target.value)} />
+              ) : (
+                <input autoFocus type={type === "link" ? "url" : "text"} placeholder={type === "link" ? "https://example.com/article" : "Follow up on the launch narrative"} value={text} onChange={(event) => { setText(event.target.value); setError(""); }} />
+              )}
+            </label>
+          ) : null}
+          {type === "image" ? (
+            <label className={file ? "drop-zone has-file" : "drop-zone"} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); setFile(event.dataTransfer.files[0] ?? null); }}>
+              <input type="file" accept="image/*,.pdf,.txt,.md" onChange={(event) => setFile(event.target.files[0] ?? null)} />
+              <FileArrowUp weight="duotone" />
+              <strong>{file ? file.name : "Drop a file here"}</strong>
+              <span>{file ? `${Math.max(1, Math.round(file.size / 1024))} KB · Ready to save` : "or click to choose an image, PDF, or document"}</span>
+            </label>
+          ) : null}
+          {type === "voice" ? (
+            <div className={recording ? "recorder is-recording" : "recorder"}>
+              <button onClick={recording ? stopRecording : startRecording}>
+                {recording ? <Stop weight="fill" /> : <Microphone weight="fill" />}
+              </button>
+              <div>
+                <strong>{recording ? `Recording ${formattedElapsed}` : audioUrl ? "Recording ready" : "Ready to record"}</strong>
+                <span>{recording ? "Tap stop when the thought is complete." : audioUrl ? "Listen back before saving." : "Your browser will ask for microphone access."}</span>
+              </div>
+              <div className="wave-bars" aria-hidden="true">
+                {Array.from({ length: 18 }, (_, index) => <i key={index} />)}
+              </div>
+              {audioUrl ? <audio controls src={audioUrl} /> : null}
+            </div>
+          ) : null}
+          {type === "reminder" ? (
+            <div className="reminder-fields">
+              <label>
+                When
+                <select value={due} onChange={(event) => setDue(event.target.value)}>
+                  <option>Today</option>
+                  <option>Tomorrow</option>
+                  <option>Next week</option>
+                </select>
+              </label>
+              <label>
+                Time
+                <input value={time} onChange={(event) => setTime(event.target.value)} placeholder="9:00 AM" />
+              </label>
+            </div>
+          ) : null}
+          {type !== "reminder" ? (
+            <label className="optional-title">
+              Title <span>optional</span>
+              <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Recall can create one for you" />
+            </label>
+          ) : null}
+        </div>
+        {error ? <p className="capture-error" role="alert">{error}</p> : null}
+        <div className="capture-insight">
+          <Sparkle weight="fill" />
+          <span><strong>Recall will organize this.</strong> It will suggest a title, summary, related memories, and any useful next step.</span>
+        </div>
+        <footer>
+          <span>{processing ? "Understanding your capture…" : "Saved locally in this browser"}</span>
+          <button className="primary-button" onClick={save} disabled={processing}>
+            {processing ? "Organizing…" : type === "reminder" ? "Create reminder" : "Save memory"}
+          </button>
+        </footer>
+      </motion.section>
+    </motion.div>
+  );
 }

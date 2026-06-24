@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { CalendarBlank, MagnifyingGlass, Plus, Sparkle } from "@phosphor-icons/react";
+import { motion, AnimatePresence } from "motion/react";
 import { Sidebar } from "./Sidebar.jsx";
 import { MobileNav } from "./MobileNav.jsx";
 import { HomePage } from "./pages/HomePage.jsx";
@@ -26,7 +27,17 @@ export function Workspace(props) {
             <span className="capture-dot"><Plus size={14} weight="bold" /></span><span>Capture</span>
           </button>
         </header>
-        <Page {...props} />
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={props.activePage}
+            initial={{ opacity: 0, y: 15, filter: "blur(5px)" }}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            exit={{ opacity: 0, y: -15, filter: "blur(5px)" }}
+            transition={{ type: "spring", stiffness: 300, damping: 24, mass: 0.8 }}
+          >
+            <Page {...props} />
+          </motion.div>
+        </AnimatePresence>
       </section>
       <aside className="context-rail">
         <section className="context-section context-today">
@@ -50,7 +61,7 @@ export function Workspace(props) {
           <div className="context-heading"><h2>Related memory</h2></div>
           {props.memories.length ? <MemoryCard memory={props.memories[1] ?? props.memories[0]} variant="compact" context="Related to today" onSelect={props.onSelectMemory} /> : <p className="rail-empty">Related memories will appear here.</p>}
         </section>
-        <button className="mobile-ask" type="button" onClick={props.onAsk}><Sparkle weight="fill" /> Ask Second Signal</button>
+        <button className="mobile-ask" type="button" onClick={props.onAsk}><Sparkle weight="fill" /> Ask Recall</button>
       </aside>
       <MobileNav {...props} />
       {profileOpen ? <button className="profile-scrim" type="button" aria-label="Close profile menu" onClick={() => setProfileOpen(false)} /> : null}

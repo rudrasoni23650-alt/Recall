@@ -4,18 +4,28 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
+    "dev": "concurrently \"pnpm run dev:frontend\" \"pnpm run dev:backend\"",
+    "dev:frontend": "vite --host 127.0.0.1",
+    "dev:backend": "node server/server.cjs",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
     "@fontsource/dm-sans": "^5.2.8",
     "@fontsource/newsreader": "^5.2.10",
+    "@google/generative-ai": "^0.24.1",
     "@phosphor-icons/react": "^2.1.10",
+    "@supabase/supabase-js": "^2.108.2",
     "@vitejs/plugin-react": "5.0.4",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
     "motion": "^12.40.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "vite": "6.4.2"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.3"
   }
 }

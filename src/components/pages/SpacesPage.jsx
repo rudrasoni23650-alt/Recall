@@ -50,7 +50,7 @@ export function SpacesPage({ memories, onSelectMemory }) {
         ))}
       </div>
 
-      <section className="space-explainer"><span>How spaces work</span><div><h2>Manual when you need control.<br />Automatic when you do not.</h2><p>Create a space for a focused project, or let Second Signal suggest one when a theme keeps appearing. A memory can belong to several spaces without being duplicated.</p></div></section>
+      <section className="space-explainer"><span>How spaces work</span><div><h2>Manual when you need control.<br />Automatic when you do not.</h2><p>Create a space for a focused project, or let Recall suggest one when a theme keeps appearing. A memory can belong to several spaces without being duplicated.</p></div></section>
 
       {selectedSpace ? <SpaceDrawer space={selectedSpace} memories={memories} onSelectMemory={onSelectMemory} onClose={() => setSelectedSpace(null)} /> : null}
     </div>

@@ -8,17 +8,22 @@ When implementing from a selected generated mock, treat that image as the source
 
 ## Locked Product Direction
 
-- Product: Second Signal, an AI-assisted second-memory MVP.
+- Product: Recall, an AI-assisted second-memory MVP.
 - Selected visual target: `exec-872f284a-69f3-439a-94d4-9b6d9a44dbb5.png`.
 - Keep the approved editorial layout: left navigation, central resurfaced memory and timeline, right daily context rail.
 - Use the same deep petrol color for both left and right rails.
-- Use plain-language navigation and labels: Home, Memories, Spaces, Reminders, Ask Second Signal.
+- Use plain-language navigation and labels: Home, Memories, Spaces, Reminders, Ask Recall.
 - Signed-out visitors see a focused welcome screen without app side rails.
 - MVP authentication and AI behavior are simulated locally; all visible controls must still work.
 
 ## Refinement Notes
 
 - Welcome page is a complete product site: balanced hero, richer navigation, how it works, features, about, pricing, FAQ, final CTA, and footer.
+- Keep one continuous responsive outer gutter across the entire welcome page; the hero sits inside it as a rounded card rather than running full bleed.
+- The welcome hero animation autoplays once on landing, then remains paused on its final frame; never loop it.
+- Treat the welcome proof band as a distinct rounded card below the hero, with clear separation and evenly centered icon-and-copy groups.
+- Present welcome-page metrics as a compact, contextual editorial module rather than a sparse oversized counter strip.
+- Use `src/assets/memory-desk-editorial.png` as the visual in the welcome page's About Recall section.
 - Sign-in offers functional simulated Google, Apple, and email methods.
 - Capture must validate each input type and support text, links, uploads, browser recording, and reminders with useful feedback.
 - Spaces and Reminders use a strict heading and spacing hierarchy; avoid loose icon-heavy layouts.
