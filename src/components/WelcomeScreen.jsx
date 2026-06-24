@@ -165,7 +165,7 @@ export function WelcomeScreen({ session, onEnter, onNavigateToApp }) {
                       }}
                     >
                       <button 
-                        onClick={() => { setWelcomeDropdownOpen(false); onNavigateToApp("home"); }}
+                        onClick={() => { onNavigateToApp("home"); setWelcomeDropdownOpen(false); }}
                         style={{
                           background: "none",
                           border: "0",
@@ -185,7 +185,7 @@ export function WelcomeScreen({ session, onEnter, onNavigateToApp }) {
                         Enter Workspace
                       </button>
                       <button 
-                        onClick={() => { setWelcomeDropdownOpen(false); onNavigateToApp("account"); }}
+                        onClick={() => { onNavigateToApp("account"); setWelcomeDropdownOpen(false); }}
                         style={{
                           background: "none",
                           border: "0",
