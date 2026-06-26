@@ -9,33 +9,53 @@ import {
   User, 
   PaintBrush, 
   Sliders,
-  Sparkle
+  GithubLogo,
+  GoogleLogo
 } from "@phosphor-icons/react";
 
-export function AccountPage({ session, memories, reminders, onSignOut, onSaveProfile, toast }) {
+export function AccountPage({ 
+  session, 
+  memories, 
+  reminders, 
+  onSignOut, 
+  onSaveProfile, 
+  toast, 
+  preferences, 
+  updatePreferences, 
+  setToast,
+  onLinkAccount
+}) {
   // Profile settings
   const [name, setName] = useState(session?.name || session?.user?.email?.split("@")[0] || "User");
-  const [bio, setBio] = useState("AI-assisted second memory space. Capturing articles, notes, and reminders.");
-  const [theme, setTheme] = useState("petrol");
+  const [bio, setBio] = useState(preferences?.bio || "AI-assisted second memory space. Capturing articles, notes, and reminders.");
+  const [theme, setTheme] = useState(preferences?.theme || "petrol");
   const [savingProfile, setSavingProfile] = useState(false);
 
-  // Preference Toggles
-  const [autoSummarize, setAutoSummarize] = useState(true);
-  const [showInsights, setShowInsights] = useState(true);
-  const [emailHighlights, setEmailHighlights] = useState(false);
-  const [compactCards, setCompactCards] = useState(false);
+  // Preference Toggles derived from props
+  const autoSummarize = preferences?.autoSummarize ?? true;
+  const showInsights = preferences?.showInsights ?? true;
+  const emailHighlights = preferences?.emailHighlights ?? false;
+  const compactCards = preferences?.compactCards ?? false;
+  const mfa = preferences?.mfa ?? false;
 
   // Account settings
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [mfa, setMfa] = useState(false);
   const [updatingPassword, setUpdatingPassword] = useState(false);
+
+  const handleToggle = (key, currentVal, label) => {
+    const newVal = !currentVal;
+    updatePreferences({ [key]: newVal });
+    if (setToast) {
+      setToast(`${label} ${newVal ? "enabled" : "disabled"}`);
+    }
+  };
 
   const handleSaveProfileSubmit = (e) => {
     e.preventDefault();
     setSavingProfile(true);
     setTimeout(() => {
-      onSaveProfile({ name, theme });
+      onSaveProfile({ name, theme, bio });
       setSavingProfile(false);
     }, 600);
   };
@@ -76,11 +96,11 @@ export function AccountPage({ session, memories, reminders, onSignOut, onSavePro
     downloadAnchor.remove();
   };
 
-  const isGoogle = session?.user?.app_metadata?.provider === "google" || session?.user?.email?.includes("gmail");
-  const isGithub = session?.user?.app_metadata?.provider === "github" || session?.isDemo;
+  const isGoogle = !!session?.googleConnected;
+  const isGithub = !!session?.githubConnected;
 
   return (
-    <div className="subpage account-page" style={{ maxWidth: "720px", margin: "0 auto" }}>
+    <div className="subpage account-page" style={{ maxWidth: "100%", margin: "0" }}>
       <div className="subpage-heading">
         <div>
           <span className="page-kicker">Settings dashboard</span>
@@ -140,7 +160,7 @@ export function AccountPage({ session, memories, reminders, onSignOut, onSavePro
                 <input 
                   type="checkbox" 
                   checked={autoSummarize} 
-                  onChange={() => setAutoSummarize(!autoSummarize)} 
+                  onChange={() => handleToggle("autoSummarize", autoSummarize, "Auto-Summarize Captures")} 
                   style={{ width: "42px", height: "24px", appearance: "none", background: autoSummarize ? "var(--coral, #f38a7c)" : "rgba(21,63,64,0.15)", borderRadius: "12px", cursor: "pointer", transition: "0.2s background-color", outline: "none" }} 
                 />
                 <span style={{ width: "16px", height: "16px", borderRadius: "50%", background: "#fff", position: "absolute", margin: "4px", transform: autoSummarize ? "translateX(18px)" : "translateX(0)", transition: "0.2s transform" }} />
@@ -157,7 +177,7 @@ export function AccountPage({ session, memories, reminders, onSignOut, onSavePro
                 <input 
                   type="checkbox" 
                   checked={showInsights} 
-                  onChange={() => setShowInsights(!showInsights)} 
+                  onChange={() => handleToggle("showInsights", showInsights, "Show AI Insights")} 
                   style={{ width: "42px", height: "24px", appearance: "none", background: showInsights ? "var(--coral, #f38a7c)" : "rgba(21,63,64,0.15)", borderRadius: "12px", cursor: "pointer", transition: "0.2s background-color", outline: "none" }} 
                 />
                 <span style={{ width: "16px", height: "16px", borderRadius: "50%", background: "#fff", position: "absolute", margin: "4px", transform: showInsights ? "translateX(18px)" : "translateX(0)", transition: "0.2s transform" }} />
@@ -174,7 +194,7 @@ export function AccountPage({ session, memories, reminders, onSignOut, onSavePro
                 <input 
                   type="checkbox" 
                   checked={emailHighlights} 
-                  onChange={() => setEmailHighlights(!emailHighlights)} 
+                  onChange={() => handleToggle("emailHighlights", emailHighlights, "Weekly Email Highlights")} 
                   style={{ width: "42px", height: "24px", appearance: "none", background: emailHighlights ? "var(--coral, #f38a7c)" : "rgba(21,63,64,0.15)", borderRadius: "12px", cursor: "pointer", transition: "0.2s background-color", outline: "none" }} 
                 />
                 <span style={{ width: "16px", height: "16px", borderRadius: "50%", background: "#fff", position: "absolute", margin: "4px", transform: emailHighlights ? "translateX(18px)" : "translateX(0)", transition: "0.2s transform" }} />
@@ -191,7 +211,7 @@ export function AccountPage({ session, memories, reminders, onSignOut, onSavePro
                 <input 
                   type="checkbox" 
                   checked={compactCards} 
-                  onChange={() => setCompactCards(!compactCards)} 
+                  onChange={() => handleToggle("compactCards", compactCards, "Compact Memory Grid")} 
                   style={{ width: "42px", height: "24px", appearance: "none", background: compactCards ? "var(--coral, #f38a7c)" : "rgba(21,63,64,0.15)", borderRadius: "12px", cursor: "pointer", transition: "0.2s background-color", outline: "none" }} 
                 />
                 <span style={{ width: "16px", height: "16px", borderRadius: "50%", background: "#fff", position: "absolute", margin: "4px", transform: compactCards ? "translateX(18px)" : "translateX(0)", transition: "0.2s transform" }} />
@@ -212,7 +232,7 @@ export function AccountPage({ session, memories, reminders, onSignOut, onSavePro
               value={theme} 
               onChange={(e) => {
                 setTheme(e.target.value);
-                onSaveProfile({ name, theme: e.target.value });
+                onSaveProfile({ name, theme: e.target.value, bio });
               }}
               style={{ height: "42px", padding: "0 12px", border: "1px solid var(--line)", borderRadius: "8px", background: "rgba(255,255,255,0.5)", fontSize: "14px", outline: "none" }}
             >
@@ -271,7 +291,7 @@ export function AccountPage({ session, memories, reminders, onSignOut, onSavePro
             <input 
               type="checkbox" 
               checked={mfa} 
-              onChange={() => setMfa(!mfa)} 
+              onChange={() => handleToggle("mfa", mfa, "Two-Factor Authentication")} 
               style={{ width: "42px", height: "24px", appearance: "none", background: mfa ? "var(--coral, #f38a7c)" : "rgba(21,63,64,0.15)", borderRadius: "12px", cursor: "pointer", transition: "0.2s background-color", outline: "none" }} 
             />
             <span style={{ width: "16px", height: "16px", borderRadius: "50%", background: "#fff", position: "absolute", margin: "4px", transform: mfa ? "translateX(18px)" : "translateX(0)", transition: "0.2s transform" }} />
@@ -291,6 +311,27 @@ export function AccountPage({ session, memories, reminders, onSignOut, onSavePro
             <div>
               <span style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase" }}>Subscription Tier</span>
               <p style={{ fontSize: "14px", fontWeight: "600", margin: "4px 0 0", color: "var(--coral-deep)" }}>Recall Pro (Free MVP)</p>
+            </div>
+          </div>
+          <div style={{ borderTop: "1px solid var(--line)", paddingTop: "16px" }}>
+            <span style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", display: "block", marginBottom: "8px" }}>Connected Accounts</span>
+            <div style={{ display: "grid", gap: "10px", marginBottom: "18px" }}>
+              <button
+                type="button"
+                onClick={() => onLinkAccount && onLinkAccount("google")}
+                style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", background: "rgba(255,255,255,0.3)", borderRadius: "8px", border: "1px solid rgba(21,63,64,0.05)", cursor: "pointer", fontFamily: "inherit", color: "inherit" }}
+              >
+                <span style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "13px", fontWeight: 600 }}><GoogleLogo size={17} weight="bold" /> Google</span>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: isGoogle ? "#10b981" : "var(--muted)" }}>{isGoogle ? "CONNECTED" : "NOT LINKED"}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onLinkAccount && onLinkAccount("github")}
+                style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", background: "rgba(255,255,255,0.3)", borderRadius: "8px", border: "1px solid rgba(21,63,64,0.05)", cursor: "pointer", fontFamily: "inherit", color: "inherit" }}
+              >
+                <span style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "13px", fontWeight: 600 }}><GithubLogo size={17} weight="bold" /> GitHub</span>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: isGithub ? "#10b981" : "var(--muted)" }}>{isGithub ? "CONNECTED" : "NOT LINKED"}</span>
+              </button>
             </div>
           </div>
           <div style={{ borderTop: "1px solid var(--line)", paddingTop: "16px" }}>

@@ -13,7 +13,7 @@ export function Sidebar({ session, activePage, onNavigate, onAsk, profileOpen, o
   return (
     <aside className="sidebar">
       <div>
-        <motion.button className="brand" whileHover={{ scale: 1.02, x: 2 }} whileTap={{ scale: 0.96 }} transition={{ type: "spring", stiffness: 300, damping: 14 }} type="button" onClick={() => onNavigate("home")}>
+        <motion.button className="brand" whileHover={{ scale: 1.02, x: 2 }} whileTap={{ scale: 0.96 }} transition={{ type: "spring", stiffness: 300, damping: 14 }} type="button" onClick={() => onNavigate("landing")} title="Go to landing page">
           <img src={logoLightAlpha} alt="Recall Logo" className="brand-logo" /> Recall
         </motion.button>
         <span className="sidebar-label">Workspace</span>
@@ -33,12 +33,11 @@ export function Sidebar({ session, activePage, onNavigate, onAsk, profileOpen, o
           <div className="profile-menu">
             <button type="button" onClick={() => { onToggleProfile(); onNavigate("profile"); }}>Profile & Theme</button>
             <button type="button" onClick={() => { onToggleProfile(); onNavigate("account"); }}>Account & Security</button>
-            <button type="button" onClick={() => { onToggleProfile(); onNavigate("landing"); }}>View landing page</button>
             <button type="button" onClick={onSignOut}>Sign out</button>
           </div>
         ) : null}
         <motion.button className="profile-button" whileHover={{ scale: 1.02, y: -2 }} whileTap={{ scale: 0.96 }} transition={{ type: "spring", stiffness: 300, damping: 14 }} type="button" onClick={onToggleProfile} aria-expanded={profileOpen}>
-          <span className="avatar">{session.name ? session.name.slice(0,2).toUpperCase() : session.user?.email ? session.user.email.slice(0,2).toUpperCase() : "DU"}</span><span><strong>{session.name || session.user?.email || "Demo User"}</strong><small>Local & private</small></span><CaretDown />
+          <span className="avatar">{session.name ? session.name.slice(0,2).toUpperCase() : session.user?.email ? session.user.email.slice(0,2).toUpperCase() : "DU"}</span><span><strong>{session.name || session.user?.email || "Demo User"}</strong><small>Signed in</small></span><CaretDown />
         </motion.button>
       </div>
     </aside>

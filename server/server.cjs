@@ -50,16 +50,50 @@ const baselineReminders = [
   { id: "reminder-2", title: "Add proof points from customer interviews", due: "Tomorrow", time: "9:00 AM", source: "Maya Chen interview", sourceId: "customer-interview", done: false }
 ];
 
+const defaultProfile = {
+  name: "Demo User",
+  googleConnected: false,
+  githubConnected: true
+};
+
+const defaultPreferences = {
+  autoSummarize: true,
+  showInsights: true,
+  emailHighlights: false,
+  compactCards: false,
+  mfa: false,
+  theme: "petrol",
+  bio: "AI-assisted second memory space. Capturing articles, notes, and reminders."
+};
+
 function readDB() {
   try {
     if (!fs.existsSync(DB_PATH)) {
-      const initial = { session: null, memories: baselineMemories, reminders: baselineReminders };
+      const initial = { 
+        session: null, 
+        memories: baselineMemories, 
+        reminders: baselineReminders,
+        profile: defaultProfile,
+        preferences: defaultPreferences,
+        spaces: []
+      };
       fs.writeFileSync(DB_PATH, JSON.stringify(initial, null, 2), 'utf8');
       return initial;
     }
-    return JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
+    const db = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
+    if (!db.profile) db.profile = defaultProfile;
+    if (!db.preferences) db.preferences = defaultPreferences;
+    if (!db.spaces) db.spaces = [];
+    return db;
   } catch (e) {
-    return { session: null, memories: baselineMemories, reminders: baselineReminders };
+    return { 
+      session: null, 
+      memories: baselineMemories, 
+      reminders: baselineReminders,
+      profile: defaultProfile,
+      preferences: defaultPreferences,
+      spaces: []
+    };
   }
 }
 
@@ -135,7 +169,14 @@ Provide a JSON response (no markdown, no backticks):
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '15mb' }));
+
+// ─── Static uploads directory ────────────────────────────────────────────────
+const UPLOADS_DIR = path.join(__dirname, 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+app.use('/api/uploads', express.static(UPLOADS_DIR));
 
 /**
  * Authenticate a request by verifying the Supabase JWT in the Authorization header.
@@ -157,28 +198,63 @@ async function authenticateUser(req) {
   }
 }
 
-// ─── Routes ───────────────────────────────────────────────────────────────────
+// POST /api/upload — upload an image or audio file as base64 and save it to the server
+app.post('/api/upload', async (req, res) => {
+  try {
+    const { fileName, fileType, base64Data } = req.body;
+    if (!fileName || !base64Data) {
+      return res.status(400).json({ success: false, error: "Missing file name or content" });
+    }
+
+    // Require crypto for UUID generation
+    const crypto = require('crypto');
+    const safeName = path.basename(fileName).replace(/[^a-zA-Z0-9.-]/g, '_');
+    const uniqueName = `${crypto.randomUUID()}-${safeName}`;
+    const filePath = path.join(UPLOADS_DIR, uniqueName);
+
+    const buffer = Buffer.from(base64Data, 'base64');
+    await fs.promises.writeFile(filePath, buffer);
+
+    console.log(`Saved file to ${filePath}`);
+    res.json({
+      success: true,
+      url: `/api/uploads/${uniqueName}`
+    });
+  } catch (err) {
+    console.error("File upload error:", err);
+    res.status(500).json({ success: false, error: "Failed to upload file" });
+  }
+});
 
 // GET /api/state — load session + memories + reminders
 app.get('/api/state', async (req, res) => {
   const userId = await authenticateUser(req);
 
-  if (!userId || !supabaseAdmin) {
+  if (supabaseAdmin && !userId) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+
+  if (!supabaseAdmin) {
     // Local fallback
     const db = readDB();
     return res.json(db);
   }
 
   try {
-    const [memoriesRes, remindersRes] = await Promise.all([
+    const [userRes, memoriesRes, remindersRes] = await Promise.all([
+      supabaseAdmin.auth.admin.getUserById(userId),
       supabaseAdmin.from('memories').select('*').eq('user_id', userId).eq('archived', false).order('created_at', { ascending: false }),
       supabaseAdmin.from('reminders').select('*').eq('user_id', userId).order('created_at', { ascending: false })
     ]);
+    const metadata = userRes.data?.user?.user_metadata || {};
 
     res.json({
       session: { userId, mode: 'live' },
       memories: (memoriesRes.data || []).map(normalizeMemory),
-      reminders: (remindersRes.data || []).map(normalizeReminder)
+      reminders: (remindersRes.data || []).map(normalizeReminder),
+      spaces: metadata.spaces || [],
+      profile: normalizeProfile(metadata, userRes.data?.user),
+      preferences: { ...defaultPreferences, ...(metadata.preferences || {}) }
     });
   } catch (err) {
     console.error("Error fetching state:", err);
@@ -186,16 +262,55 @@ app.get('/api/state', async (req, res) => {
   }
 });
 
+// POST /api/spaces — save spaces list
+app.post('/api/spaces', async (req, res) => {
+  const userId = await authenticateUser(req);
+  const { spaces } = req.body;
+
+  if (supabaseAdmin && !userId) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+
+  if (!supabaseAdmin) {
+    const db = readDB();
+    db.spaces = spaces || [];
+    writeDB(db);
+    return res.json({ success: true, spaces: db.spaces });
+  }
+
+  try {
+    const { data: userData, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(userId);
+    if (getUserError) throw getUserError;
+
+    const currentMetadata = userData.user?.user_metadata || {};
+    const { data: updatedUser, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+      userId,
+      {
+        user_metadata: {
+          ...currentMetadata,
+          spaces: spaces || []
+        }
+      }
+    );
+
+    if (updateError) throw updateError;
+    res.json({ success: true, spaces: updatedUser.user?.user_metadata?.spaces || [] });
+  } catch (err) {
+    console.error("Error saving spaces:", err);
+    res.status(500).json({ error: "Failed to save spaces" });
+  }
+});
+
 // POST /api/memories — create a new memory
 app.post('/api/memories', async (req, res) => {
   const userId = await authenticateUser(req);
-  const { memory, reminder } = req.body;
+  const { memory, reminder, autoSummarize } = req.body;
 
   let enrichedMemory = { ...memory };
   let enrichedReminder = reminder;
 
   // AI enrichment
-  if (genAI && (memory.type === 'note' || memory.type === 'link')) {
+  if (autoSummarize !== false && genAI && (memory.type === 'note' || memory.type === 'link')) {
     const content = memory.type === 'link' ? memory.url : memory.excerpt;
     const aiResult = await generateAISummary(memory.type, content);
     if (aiResult) {
@@ -215,7 +330,11 @@ app.post('/api/memories', async (req, res) => {
     }
   }
 
-  if (!userId || !supabaseAdmin) {
+  if (supabaseAdmin && !userId) {
+    return res.status(401).json({ success: false, error: "Authentication required" });
+  }
+
+  if (!supabaseAdmin) {
     // Local fallback
     const db = readDB();
     db.memories.unshift(enrichedMemory);
@@ -283,12 +402,64 @@ app.post('/api/memories', async (req, res) => {
   }
 });
 
+// POST /api/profile — save profile and preferences
+app.post('/api/profile', async (req, res) => {
+  const userId = await authenticateUser(req);
+  const { profile, preferences } = req.body;
+
+  if (supabaseAdmin && !userId) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+
+  if (!supabaseAdmin) {
+    const db = readDB();
+    if (profile) db.profile = { ...(db.profile || {}), ...profile };
+    if (preferences) db.preferences = { ...(db.preferences || {}), ...preferences };
+    writeDB(db);
+    return res.json({ success: true, profile: db.profile, preferences: db.preferences });
+  }
+
+  try {
+    const { data: userData, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(userId);
+    if (getUserError) throw getUserError;
+
+    const currentMetadata = userData.user?.user_metadata || {};
+    const nextMetadata = {
+      ...currentMetadata,
+      ...(profile || {}),
+      preferences: {
+        ...(currentMetadata.preferences || {}),
+        ...(preferences || {}),
+      },
+      updated_at: new Date().toISOString()
+    };
+
+    const { data: updatedUser, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+      user_metadata: nextMetadata
+    });
+    if (updateError) throw updateError;
+
+    res.json({
+      success: true,
+      profile: normalizeProfile(updatedUser.user?.user_metadata || {}, updatedUser.user),
+      preferences: { ...defaultPreferences, ...((updatedUser.user?.user_metadata || {}).preferences || {}) }
+    });
+  } catch (err) {
+    console.error("Error saving profile to Supabase Auth metadata:", err);
+    res.status(500).json({ error: "Failed to save profile" });
+  }
+});
+
 // POST /api/reminders/toggle
 app.post('/api/reminders/toggle', async (req, res) => {
   const userId = await authenticateUser(req);
   const { id } = req.body;
 
-  if (!userId || !supabaseAdmin) {
+  if (supabaseAdmin && !userId) {
+    return res.status(401).json({ success: false, error: "Authentication required" });
+  }
+
+  if (!supabaseAdmin) {
     const db = readDB();
     db.reminders = db.reminders.map(r => r.id !== id ? r : { ...r, done: !r.done });
     writeDB(db);
@@ -311,7 +482,11 @@ app.post('/api/memories/archive', async (req, res) => {
   const userId = await authenticateUser(req);
   const { id } = req.body;
 
-  if (!userId || !supabaseAdmin) {
+  if (supabaseAdmin && !userId) {
+    return res.status(401).json({ success: false, error: "Authentication required" });
+  }
+
+  if (!supabaseAdmin) {
     const db = readDB();
     db.memories = db.memories.map(m => m.id !== id ? m : { ...m, archived: true });
     writeDB(db);
@@ -334,6 +509,10 @@ app.post('/api/ask', async (req, res) => {
   const { question } = req.body;
 
   let memories = [];
+
+  if (supabaseAdmin && !userId) {
+    return res.status(401).json({ success: false, error: "Authentication required" });
+  }
 
   if (userId && supabaseAdmin) {
     const { data } = await supabaseAdmin.from('memories').select('*').eq('user_id', userId).eq('archived', false);
@@ -412,6 +591,7 @@ function normalizeMemory(row) {
     url: row.url,
     fileName: row.file_name,
     audioUrl: row.audio_url,
+    imageUrl: row.type === 'image' ? row.url : null,
     archived: row.archived,
     sourceIds: row.source_ids || [],
     duration: row.duration,
@@ -429,6 +609,16 @@ function normalizeReminder(row) {
     sourceId: row.source_id,
     done: row.done,
     createdAt: row.created_at,
+  };
+}
+
+function normalizeProfile(metadata, user) {
+  const hasGoogleIdentity = user?.identities?.some((identity) => identity.provider === "google") ?? false;
+  const hasGithubIdentity = user?.identities?.some((identity) => identity.provider === "github") ?? false;
+  return {
+    name: metadata.name || user?.email?.split("@")[0] || "Recall User",
+    googleConnected: hasGoogleIdentity || metadata.googleConnected || metadata.google_connected || false,
+    githubConnected: hasGithubIdentity || metadata.githubConnected || metadata.github_connected || false,
   };
 }
 

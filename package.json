@@ -26,6 +26,15 @@
     "vite": "6.4.2"
   },
   "devDependencies": {
-    "concurrently": "^10.0.3"
+    "concurrently": "^10.0.3",
+    "@playwright/test": "^1.48.2"
+  },
+  "scripts": {
+    "dev": "concurrently \"pnpm run dev:frontend\" \"pnpm run dev:backend\"",
+    "dev:frontend": "vite --host 127.0.0.1",
+    "dev:backend": "node server/server.cjs",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test:e2e": "playwright test"
   }
 }

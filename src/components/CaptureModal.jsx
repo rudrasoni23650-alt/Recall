@@ -75,7 +75,39 @@ export function CaptureModal({ onClose, onSave }) {
   const validUrl = type !== "link" || /^https?:\/\//i.test(text.trim());
   const canSave = type === "image" ? !!file : type === "voice" ? !!audioUrl : !!text.trim() && validUrl;
 
-  const save = () => {
+  const uploadFile = async (fileObject) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64Data = reader.result.split(',')[1];
+        try {
+          const res = await fetch('/api/upload', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              fileName: fileObject.name,
+              fileType: fileObject.type,
+              base64Data
+            })
+          });
+          const data = await res.json();
+          if (data.success && data.url) {
+            resolve(data.url);
+          } else {
+            reject(new Error(data.error || "Upload failed"));
+          }
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(fileObject);
+    });
+  };
+
+  const save = async () => {
     if (!canSave) {
       setError(type === "link" ? "Paste a complete link beginning with http:// or https://." : "Add something before saving this memory.");
       return;
@@ -83,13 +115,33 @@ export function CaptureModal({ onClose, onSave }) {
     setProcessing(true);
     const cleanText = text.trim();
     const memoryTitle = title.trim() || (type === "link" ? new URL(cleanText).hostname.replace("www.", "") : type === "image" ? file.name : type === "voice" ? "Recorded thought" : cleanText.split(/\n|\.|:/)[0].slice(0, 64));
+
+    let finalImageUrl = undefined;
+    let finalAudioUrl = audioUrl;
+
+    try {
+      if (type === "image" && file) {
+        finalImageUrl = await uploadFile(file);
+      } else if (type === "voice" && audioUrl) {
+        const blob = await fetch(audioUrl).then((r) => r.blob());
+        const audioFile = new File([blob], `voice-recording-${Date.now()}.wav`, { type: blob.type || "audio/wav" });
+        finalAudioUrl = await uploadFile(audioFile);
+      }
+    } catch (err) {
+      console.error("Upload error:", err);
+      setError("Failed to upload the file to server.");
+      setProcessing(false);
+      return;
+    }
+
     window.setTimeout(() => onSave({
       type: type === "reminder" ? "note" : type,
       title: memoryTitle,
       excerpt: type === "link" ? `Saved link from ${new URL(cleanText).hostname}` : type === "image" ? `Uploaded ${file.name} · ${Math.max(1, Math.round(file.size / 1024))} KB` : type === "voice" ? `Recorded voice note · ${formattedElapsed}` : cleanText.slice(0, 140),
       url: type === "link" ? cleanText : undefined,
       fileName: file?.name,
-      audioUrl,
+      audioUrl: finalAudioUrl,
+      imageUrl: finalImageUrl,
       reminder: type === "reminder" ? { title: cleanText, due, time } : undefined,
     }), 780);
   };

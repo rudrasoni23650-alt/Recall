@@ -1,26 +1,26 @@
 import { useState } from "react";
 import { ArrowRight, Cloud, GithubLogo, GoogleLogo, User, ShieldCheck, PaintBrush } from "@phosphor-icons/react";
 
-export function ProfilePage({ session, onSaveProfile, toast }) {
+export function ProfilePage({ session, onSaveProfile, toast, preferences, onLinkAccount }) {
   const [name, setName] = useState(session?.name || session?.user?.email?.split("@")[0] || "User");
-  const [bio, setBio] = useState("AI-assisted second memory space. Capturing articles, notes, and reminders.");
-  const [theme, setTheme] = useState("petrol");
+  const [bio, setBio] = useState(preferences?.bio || "AI-assisted second memory space. Capturing articles, notes, and reminders.");
+  const [theme, setTheme] = useState(preferences?.theme || "petrol");
   const [saving, setSaving] = useState(false);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setSaving(true);
     setTimeout(() => {
-      onSaveProfile({ name, theme });
+      onSaveProfile({ name, theme, bio });
       setSaving(false);
     }, 600);
   };
 
-  const isGoogle = session?.user?.app_metadata?.provider === "google" || session?.user?.email?.includes("gmail");
-  const isGithub = session?.user?.app_metadata?.provider === "github" || session?.isDemo;
+  const isGoogle = !!session?.googleConnected;
+  const isGithub = !!session?.githubConnected;
 
   return (
-    <div className="subpage profile-page" style={{ maxWidth: "680px", margin: "0 auto" }}>
+    <div className="subpage profile-page" style={{ maxWidth: "100%", margin: "0" }}>
       <div className="subpage-heading">
         <div>
           <span className="page-kicker">Personal settings</span>
@@ -97,14 +97,22 @@ export function ProfilePage({ session, onSaveProfile, toast }) {
             <ShieldCheck size={20} weight="duotone" /> Connected Accounts
           </h2>
           <div style={{ display: "grid", gap: "12px" }}>
-            <div style={{ display: "flex", alignItems: "center", justifySelf: "stretch", justifyContent: "space-between", padding: "12px", background: "rgba(255,255,255,0.3)", borderRadius: "8px", border: "1px solid rgba(21,63,64,0.05)" }}>
+            <button
+              type="button"
+              onClick={() => onLinkAccount && onLinkAccount("google")}
+              style={{ display: "flex", width: "100%", alignItems: "center", justifySelf: "stretch", justifyContent: "space-between", padding: "12px", background: "rgba(255,255,255,0.3)", borderRadius: "8px", border: "1px solid rgba(21,63,64,0.05)", cursor: "pointer", fontFamily: "inherit", color: "inherit", outline: "none" }}
+            >
               <span style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "14px" }}><GoogleLogo size={18} weight="bold" /> Google Account</span>
               <span style={{ fontSize: "11px", fontWeight: "600", color: isGoogle ? "#10b981" : "var(--muted)" }}>{isGoogle ? "CONNECTED" : "NOT LINKED"}</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", justifySelf: "stretch", justifyContent: "space-between", padding: "12px", background: "rgba(255,255,255,0.3)", borderRadius: "8px", border: "1px solid rgba(21,63,64,0.05)" }}>
+            </button>
+            <button
+              type="button"
+              onClick={() => onLinkAccount && onLinkAccount("github")}
+              style={{ display: "flex", width: "100%", alignItems: "center", justifySelf: "stretch", justifyContent: "space-between", padding: "12px", background: "rgba(255,255,255,0.3)", borderRadius: "8px", border: "1px solid rgba(21,63,64,0.05)", cursor: "pointer", fontFamily: "inherit", color: "inherit", outline: "none" }}
+            >
               <span style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "14px" }}><GithubLogo size={18} weight="bold" /> GitHub Account</span>
               <span style={{ fontSize: "11px", fontWeight: "600", color: isGithub ? "#10b981" : "var(--muted)" }}>{isGithub ? "CONNECTED" : "NOT LINKED"}</span>
-            </div>
+            </button>
           </div>
         </section>
 

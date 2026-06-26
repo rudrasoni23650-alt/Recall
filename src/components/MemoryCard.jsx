@@ -7,7 +7,7 @@ import {
   Play,
   Waveform,
 } from "@phosphor-icons/react";
-import boardImage from "../assets/privacy-positioning-board.png";
+import fallbackBoardImg from "../assets/privacy-positioning-board.png";
 
 const typeDetails = {
   note: { label: "Note", Icon: FileText },
@@ -30,12 +30,16 @@ export function MemoryCard({ memory, onSelect, variant = "library", context = ""
       {!isCompact ? (
         <div className="memory-card-visual">
           {memory.type === "image" ? (
-            <img src={boardImage} alt="Visual preview from the launch moodboard" />
+            <img src={memory.imageUrl || (memory.type === "image" && memory.url) || fallbackBoardImg} alt={`Visual preview: ${memory.title}`} />
           ) : (
             <div className="memory-card-cover">
               <span className="memory-card-cover-label"><Icon weight="duotone" /> {label}</span>
               {memory.type === "voice" ? (
-                <span className="memory-card-voice"><Play weight="fill" /><strong>{memory.duration ?? "2:31"}</strong><small>Recorded conversation</small></span>
+                <span className="memory-card-voice">
+                  <Play weight="fill" />
+                  <strong>{memory.duration ?? "0:00"}</strong>
+                  <small>{memory.audioUrl ? "Tap to preview recording" : "Recorded conversation"}</small>
+                </span>
               ) : null}
               {memory.type === "link" ? (
                 <span className="memory-card-link"><small>Saved from</small><strong>{memory.url ? new URL(memory.url).hostname : "Research collection"}</strong><ArrowSquareOut /></span>

@@ -2,9 +2,20 @@ import { ArrowRight, FileText, Image, Link, Sparkle, Waveform } from "@phosphor-
 import { MemoryTimeline } from "../MemoryTimeline.jsx";
 import boardImage from "../../assets/privacy-positioning-board.png";
 
-export function HomePage({ memories, onCapture, onSelectMemory, reminders = [] }) {
+export function HomePage({ memories, onCapture, onSelectMemory, reminders = [], preferences }) {
   if (!memories.length) {
-    return <section className="empty-home"><div className="empty-mark"><Sparkle weight="fill" /></div><h1>Your space is quiet.</h1><p>Capture your first thought, link, image, or voice note. Recall will organize it and bring it back when it becomes useful.</p><button className="primary-button" type="button" onClick={onCapture}>Capture your first memory <ArrowRight weight="bold" /></button></section>;
+    return (
+      <div className="home-page">
+        <section className="empty-home">
+          <div className="empty-mark"><Sparkle weight="fill" /></div>
+          <h1>Your space is quiet.</h1>
+          <p>Capture your first thought, link, image, or voice note. Recall will organize it and bring it back when it becomes useful.</p>
+          <button className="primary-button" type="button" onClick={onCapture}>
+            Capture your first memory <ArrowRight weight="bold" />
+          </button>
+        </section>
+      </div>
+    );
   }
 
   // Check if we are in the demo space containing the baseline memories
@@ -66,8 +77,12 @@ export function HomePage({ memories, onCapture, onSelectMemory, reminders = [] }
                 <img src={boardImage} alt="Launch brief with core messaging and proof points" />
               </button>
               <div className="memory-understanding">
-                <div className="ai-label"><Sparkle weight="fill" /> AI summary</div>
-                <p>This brief brings your strongest launch ideas into one place. The clearest message is simple: capture without friction, understand automatically, and return to useful ideas with context.</p>
+                {preferences?.showInsights !== false && (
+                  <>
+                    <div className="ai-label"><Sparkle weight="fill" /> AI summary</div>
+                    <p>This brief brings your strongest launch ideas into one place. The clearest message is simple: capture without friction, understand automatically, and return to useful ideas with context.</p>
+                  </>
+                )}
                 <div className="sources-used">
                   <span><Link /> Sources used</span>
                   <button onClick={() => onSelectMemory(resurfacedMemory)}><FileText /> Launch brief v1.2 <time>May 9, 2024</time></button>
@@ -80,11 +95,13 @@ export function HomePage({ memories, onCapture, onSelectMemory, reminders = [] }
                     onSelectMemory(m);
                   }}><FileText /> Core messaging notes <time>Apr 28, 2024</time></button>
                 </div>
-                <div className="suggested-action">
-                  <span className="action-icon"><Sparkle weight="fill" /></span>
-                  <span><small>Suggested next step</small>Review customer interview for supporting quotes.</span>
-                  <button type="button" onClick={() => onSelectMemory(resurfacedMemory)}>Open memory</button>
-                </div>
+                {preferences?.showInsights !== false && (
+                  <div className="suggested-action">
+                    <span className="action-icon"><Sparkle weight="fill" /></span>
+                    <span><small>Suggested next step</small>Review customer interview for supporting quotes.</span>
+                    <button type="button" onClick={() => onSelectMemory(resurfacedMemory)}>Open memory</button>
+                  </div>
+                )}
               </div>
             </article>
           ) : (
@@ -99,19 +116,25 @@ export function HomePage({ memories, onCapture, onSelectMemory, reminders = [] }
                 )}
               </button>
               <div className="memory-understanding">
-                <div className="ai-label"><Sparkle weight="fill" /> AI summary</div>
-                <p>{resurfacedMemory.excerpt || "This memory contains your saved information. Recall will bring it back when it is relevant to your context."}</p>
+                {preferences?.showInsights !== false && (
+                  <>
+                    <div className="ai-label"><Sparkle weight="fill" /> AI summary</div>
+                    <p>{resurfacedMemory.excerpt || "This memory contains your saved information. Recall will bring it back when it is relevant to your context."}</p>
+                  </>
+                )}
                 <div className="sources-used">
                   <span><Link /> Sources used</span>
                   <button onClick={() => onSelectMemory(resurfacedMemory)}>
                     <Icon /> {resurfacedMemory.title} <time>{resurfacedMemory.time}</time>
                   </button>
                 </div>
-                <div className="suggested-action">
-                  <span className="action-icon"><Sparkle weight="fill" /></span>
-                  <span><small>Suggested next step</small>{suggestedAction}</span>
-                  <button type="button" onClick={() => onSelectMemory(resurfacedMemory)}>Open memory</button>
-                </div>
+                {preferences?.showInsights !== false && (
+                  <div className="suggested-action">
+                    <span className="action-icon"><Sparkle weight="fill" /></span>
+                    <span><small>Suggested next step</small>{suggestedAction}</span>
+                    <button type="button" onClick={() => onSelectMemory(resurfacedMemory)}>Open memory</button>
+                  </div>
+                )}
               </div>
             </article>
           )}

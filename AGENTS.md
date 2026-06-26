@@ -14,7 +14,8 @@ When implementing from a selected generated mock, treat that image as the source
 - Use the same deep petrol color for both left and right rails.
 - Use plain-language navigation and labels: Home, Memories, Spaces, Reminders, Ask Recall.
 - Signed-out visitors see a focused welcome screen without app side rails.
-- MVP authentication and AI behavior are simulated locally; all visible controls must still work.
+- First-time sign-up and free-space creation flows land on Profile so users can personalize their space before starting.
+- Authentication, profile data, memories, reminders, and AI-backed behavior are Supabase/backend-backed; do not replace sign-in or persistence with local-only simulation.
 
 ## Refinement Notes
 
@@ -25,6 +26,7 @@ When implementing from a selected generated mock, treat that image as the source
 - Present welcome-page metrics as a compact, contextual editorial module rather than a sparse oversized counter strip.
 - Use `src/assets/memory-desk-editorial.png` as the visual in the welcome page's About Recall section.
 - Sign-in offers functional simulated Google, Apple, and email methods.
+- Signing in with Google or GitHub must automatically show that provider as connected anywhere connected accounts are displayed.
 - Capture must validate each input type and support text, links, uploads, browser recording, and reminders with useful feedback.
 - Spaces and Reminders use a strict heading and spacing hierarchy; avoid loose icon-heavy layouts.
 - Reminder completion must update real state and clearly separate Today, Upcoming, and Completed.

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { ArrowUp, FileText, Sparkle, X } from "@phosphor-icons/react";
 import { motion } from "motion/react";
+import { supabase } from "../lib/supabase.js";
 
 export function AskPanel({ memories, onSelectMemory, onClose }) {
   const [question, setQuestion] = useState("");
@@ -23,11 +24,14 @@ export function AskPanel({ memories, onSelectMemory, onClose }) {
     setQuestion("");
     setAsking(true);
     
-    fetch("/api/ask", {
+    supabase.auth.getSession().then(({ data: sessionData }) => fetch("/api/ask", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(sessionData?.session?.access_token ? { Authorization: `Bearer ${sessionData.session.access_token}` } : {}),
+      },
       body: JSON.stringify({ question: queryText })
-    })
+    }))
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {

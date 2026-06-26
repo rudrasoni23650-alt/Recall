@@ -3,21 +3,26 @@ import { motion, useScroll, useTransform } from "motion/react";
 import {
   ArrowDown,
   ArrowRight,
+  Bell,
   Check,
   CirclesThreePlus,
   CloudSlash,
   Export,
   FileText,
+  Gear,
   GithubLogo,
   GoogleLogo,
+  House,
   Image,
   LinkSimple,
   LockKey,
   MagnifyingGlass,
   Microphone,
   ShieldCheck,
+  SignOut,
   Sparkle,
   Stack,
+  User,
   Waveform,
   X,
 } from "@phosphor-icons/react";
@@ -65,6 +70,19 @@ export function WelcomeScreen({ session, onEnter, onNavigateToApp }) {
     : session?.user?.email 
       ? session.user.email.slice(0, 2).toUpperCase() 
       : "DU";
+
+  // Close dropdown on click outside using element.closest() traversing
+  useEffect(() => {
+    if (!welcomeDropdownOpen) return;
+    const handleClickOutside = (event) => {
+      const isInside = event.target.closest(".welcome-profile-dropdown") || event.target.closest(".welcome-account-actions");
+      if (!isInside) {
+        setWelcomeDropdownOpen(false);
+      }
+    };
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, [welcomeDropdownOpen]);
 
   // Listen for App.jsx to signal that anonymous auth failed → open real auth modal
   useEffect(() => {
@@ -144,90 +162,80 @@ export function WelcomeScreen({ session, onEnter, onNavigateToApp }) {
                     {initials}
                   </motion.button>
                   {welcomeDropdownOpen && (
-                    <div 
-                      className="welcome-profile-dropdown" 
-                      style={{
-                        position: "absolute",
-                        top: "48px",
-                        right: "0",
-                        background: "rgba(255, 255, 255, 0.92)",
-                        border: "1px solid rgba(21,63,64,0.15)",
-                        borderRadius: "12px",
-                        boxShadow: "0 10px 30px rgba(8,60,62,0.15)",
-                        padding: "6px",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "2px",
-                        minWidth: "160px",
-                        zIndex: 1000,
-                        backdropFilter: "blur(8px)",
-                        WebkitBackdropFilter: "blur(8px)"
-                      }}
-                    >
+                    <div className="welcome-profile-dropdown">
+                      <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--line)", marginBottom: "4px" }}>
+                        <p style={{ margin: 0, fontSize: "12px", fontWeight: "600", color: "var(--petrol)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {session.name || session.user?.email || "Demo User"}
+                        </p>
+                        <p style={{ margin: "2px 0 0", fontSize: "10px", color: "var(--muted)" }}>
+                          {session.isDemo ? "Local Sandbox Demo" : "Cloud Account"}
+                        </p>
+                      </div>
+
+                      <span className="welcome-dropdown-section-title" style={{ borderTop: "none", marginTop: 0 }}>Workspace</span>
+                      
                       <button 
-                        onClick={() => { onNavigateToApp("home"); setWelcomeDropdownOpen(false); }}
-                        style={{
-                          background: "none",
-                          border: "0",
-                          padding: "8px 12px",
-                          textAlign: "left",
-                          fontSize: "13px",
-                          fontWeight: "600",
-                          cursor: "pointer",
-                          borderRadius: "6px",
-                          color: "var(--petrol)",
-                          display: "block",
-                          width: "100%"
-                        }}
-                        onMouseEnter={(e) => e.target.style.background = "rgba(21, 63, 64, 0.05)"}
-                        onMouseLeave={(e) => e.target.style.background = "none"}
+                        className="welcome-dropdown-item"
+                        onClick={() => onNavigateToApp("home")}
                       >
-                        Enter Workspace
+                        <House size={16} weight="duotone" />
+                        <span>Enter Workspace</span>
                       </button>
+                      
                       <button 
-                        onClick={() => { onNavigateToApp("account"); setWelcomeDropdownOpen(false); }}
-                        style={{
-                          background: "none",
-                          border: "0",
-                          padding: "8px 12px",
-                          textAlign: "left",
-                          fontSize: "13px",
-                          fontWeight: "600",
-                          cursor: "pointer",
-                          borderRadius: "6px",
-                          color: "var(--petrol)",
-                          display: "block",
-                          width: "100%"
-                        }}
-                        onMouseEnter={(e) => e.target.style.background = "rgba(21, 63, 64, 0.05)"}
-                        onMouseLeave={(e) => e.target.style.background = "none"}
+                        className="welcome-dropdown-item"
+                        onClick={() => onNavigateToApp("memories")}
                       >
-                        Account Settings
+                        <Stack size={16} weight="duotone" />
+                        <span>Memory Library</span>
                       </button>
+                      
                       <button 
+                        className="welcome-dropdown-item"
+                        onClick={() => onNavigateToApp("spaces")}
+                      >
+                        <CirclesThreePlus size={16} weight="duotone" />
+                        <span>Spaces</span>
+                      </button>
+
+                      <button 
+                        className="welcome-dropdown-item"
+                        onClick={() => onNavigateToApp("reminders")}
+                      >
+                        <Bell size={16} weight="duotone" />
+                        <span>Reminders</span>
+                      </button>
+
+                      <span className="welcome-dropdown-section-title">Settings</span>
+                      
+                      <button 
+                        className="welcome-dropdown-item"
+                        onClick={() => onNavigateToApp("profile")}
+                      >
+                        <User size={16} weight="duotone" />
+                        <span>Profile & Theme</span>
+                      </button>
+
+                      <button 
+                        className="welcome-dropdown-item"
+                        onClick={() => onNavigateToApp("account")}
+                      >
+                        <Gear size={16} weight="duotone" />
+                        <span>Account Settings</span>
+                      </button>
+
+                      <span className="welcome-dropdown-section-title">Actions</span>
+
+                      <button 
+                        className="welcome-dropdown-item welcome-dropdown-item--danger"
                         onClick={async () => {
-                          setWelcomeDropdownOpen(false);
                           const { supabase } = await import("../lib/supabase.js");
                           await supabase.auth.signOut();
                           window.location.reload();
                         }}
-                        style={{
-                          background: "none",
-                          border: "0",
-                          padding: "8px 12px",
-                          textAlign: "left",
-                          fontSize: "13px",
-                          fontWeight: "600",
-                          cursor: "pointer",
-                          borderRadius: "6px",
-                          color: "#ef4444",
-                          display: "block",
-                          width: "100%"
-                        }}
-                        onMouseEnter={(e) => e.target.style.background = "rgba(239, 68, 68, 0.05)"}
-                        onMouseLeave={(e) => e.target.style.background = "none"}
                       >
-                        Sign Out
+                        <SignOut size={16} />
+                        <span>Sign Out</span>
                       </button>
                     </div>
                   )}
@@ -342,23 +350,49 @@ export function WelcomeScreen({ session, onEnter, onNavigateToApp }) {
           </div>
         </motion.section>
 
-        <motion.section className="workflow-section" id="workflows" initial="hidden" whileInView="visible" viewport={vp} variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.1 } } }}>
-          <header className="workflow-heading"><motion.span variants={{ hidden: { opacity: 0, y: 60, scale: 0.92, rotateX: 10 }, visible: { opacity: 1, y: 0, scale: 1, rotateX: 0, transition: popularSpring } }}>Memory workflows</motion.span><motion.h2 variants={{ hidden: { opacity: 0, y: 60, scale: 0.92, rotateX: 10 }, visible: { opacity: 1, y: 0, scale: 1, rotateX: 0, transition: popularSpring } }}>One space.<br />Different kinds of thinking.</motion.h2><motion.p variants={{ hidden: { opacity: 0, y: 60, scale: 0.92, rotateX: 10 }, visible: { opacity: 1, y: 0, scale: 1, rotateX: 0, transition: popularSpring } }}>Use Recall for the work already moving through your mind.</motion.p></header>
-          <div className="workflow-grid">
-            <motion.article variants={{ hidden: { opacity: 0, y: 60, scale: 0.92, rotateX: 10 }, visible: { opacity: 1, y: 0, scale: 1, rotateX: 0, transition: popularSpring } }} whileHover={{ scale: 1.02, y: -5 }} whileTap={{ scale: 0.98 }}>
-              <motion.div className="workflow-media workflow-media--board" style={{ y: yParallaxSlow }}><img src={boardImage} alt="Launch research organized into a visual positioning brief" /></motion.div>
-              <span>Research and decisions</span><h3>Launch narrative</h3><p>Bring interviews, market links, and evolving messaging into one source-grounded space.</p>
-            </motion.article>
-            <motion.article variants={{ hidden: { opacity: 0, y: 60, scale: 0.92, rotateX: 10 }, visible: { opacity: 1, y: 0, scale: 1, rotateX: 0, transition: popularSpring } }} whileHover={{ scale: 1.02, y: -5 }} whileTap={{ scale: 0.98 }}>
-              <motion.div className="workflow-media workflow-media--notebook" style={{ y: yParallaxSlow }}><img src={heroNotebook} alt="Notebook with visual references for a personal inspiration space" /></motion.div>
-              <span>Visual memory</span><h3>Inspiration that stays useful</h3><p>Keep images and fragments recognizable without turning your library into a filing project.</p>
-            </motion.article>
-            <motion.article variants={{ hidden: { opacity: 0, y: 60, scale: 0.92, rotateX: 10 }, visible: { opacity: 1, y: 0, scale: 1, rotateX: 0, transition: popularSpring } }} whileHover={{ scale: 1.02, y: -5 }} whileTap={{ scale: 0.98 }}>
-              <motion.div className="workflow-media workflow-media--voice" style={{ y: yParallaxSlow }}><Waveform weight="duotone" /><div><small>Interview · 02:31</small><strong>“Control matters more than technical detail.”</strong><span>3 themes · 2 useful actions</span></div></motion.div>
-              <span>Conversation memory</span><h3>Interview synthesis</h3><p>Connect the exact recording to the themes, proof points, and next steps it produced.</p>
-            </motion.article>
+        <motion.section className="hiw-section" id="workflows" initial="hidden" whileInView="visible" viewport={vp} variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.12 } } }}>
+          <header className="workflow-heading">
+            <motion.span variants={{ hidden: { opacity: 0, y: 40 }, visible: { opacity: 1, y: 0, transition: popularSpring } }}>How it works</motion.span>
+            <motion.h2 variants={{ hidden: { opacity: 0, y: 40 }, visible: { opacity: 1, y: 0, transition: popularSpring } }}>From a thought<br />to something lasting.</motion.h2>
+            <motion.p variants={{ hidden: { opacity: 0, y: 40 }, visible: { opacity: 1, y: 0, transition: popularSpring } }}>Recall turns scattered input into a connected memory — quietly, without extra work from you.</motion.p>
+          </header>
+
+          <div className="hiw-steps">
+            {[
+              { n: "01", icon: Microphone, label: "Capture", title: "Save it before it fades", body: "Drop in a note, paste a link, upload an image, record your voice, or set a reminder. Any format, any moment — Recall takes it as-is." },
+              { n: "02", icon: Sparkle, label: "Understand", title: "Recall reads it so you don't have to", body: "The AI creates a clean title, a two-sentence summary, and surfaces the action buried inside — no tagging, no filing, no prompt needed." },
+              { n: "03", icon: MagnifyingGlass, label: "Find", title: "Search by meaning, not keywords", body: "Ask a half-remembered question in plain language. Recall finds the memory that matches the idea, not just the exact words you used." },
+              { n: "04", icon: LinkSimple, label: "Act", title: "Every answer leads somewhere real", body: "Reminders, summaries, and AI answers each carry a clickable trail back to the source memory — so context is never a black box." },
+            ].map(({ n, icon: Icon, label, title, body }, i, arr) => (
+              <motion.div
+                key={n}
+                className="hiw-step"
+                variants={{ hidden: { opacity: 0, y: 50 }, visible: { opacity: 1, y: 0, transition: popularSpring } }}
+              >
+                <div className="hiw-step-left">
+                  <span className="hiw-step-number">{n}</span>
+                  {i < arr.length - 1 && <div className="hiw-connector" />}
+                </div>
+                <div className="hiw-step-body">
+                  <div className="hiw-step-icon"><Icon weight="duotone" /></div>
+                  <span className="hiw-step-label">{label}</span>
+                  <h3>{title}</h3>
+                  <p>{body}</p>
+                </div>
+              </motion.div>
+            ))}
           </div>
-          <motion.button className="workflow-demo-button" variants={{ hidden: { opacity: 0, y: 60, scale: 0.92, rotateX: 10 }, visible: { opacity: 1, y: 0, scale: 1, rotateX: 0, transition: popularSpring } }} whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.95 }} type="button" onClick={() => onEnter("demo")}>Explore all workflows <ArrowRight /></motion.button>
+
+          <motion.button
+            className="workflow-demo-button"
+            variants={{ hidden: { opacity: 0, y: 30 }, visible: { opacity: 1, y: 0, transition: popularSpring } }}
+            whileHover={{ scale: 1.05, y: -2 }}
+            whileTap={{ scale: 0.95 }}
+            type="button"
+            onClick={() => onEnter("demo")}
+          >
+            Try it yourself <ArrowRight />
+          </motion.button>
         </motion.section>
 
         <motion.section className="pricing-section pricing-section--reference" id="pricing" initial="hidden" whileInView="visible" viewport={vp} variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.1 } } }}>
@@ -400,10 +434,19 @@ function AuthModal({ mode, onClose, onEnter }) {
   const [error, setError] = useState("");
   const [emailSent, setEmailSent] = useState(false);
 
+  const queueFirstRunProfile = () => {
+    if (mode === "create") localStorage.setItem("recall-first-run-profile-pending", "true");
+  };
+
+  const clearFirstRunProfile = () => {
+    if (mode === "create") localStorage.removeItem("recall-first-run-profile-pending");
+  };
+
   const handleGoogle = async () => {
     setLoading("google");
     setError("");
     try {
+      queueFirstRunProfile();
       const { supabase } = await import("../lib/supabase.js");
       const { error: err } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -411,7 +454,8 @@ function AuthModal({ mode, onClose, onEnter }) {
       });
       if (err) throw err;
     } catch (err) {
-      setError(err.message || "Google sign-in failed. Make sure Google OAuth is enabled in Supabase.");
+      clearFirstRunProfile();
+      setError(err.message || "Google sign-in failed. Check the Google provider in Supabase Auth.");
       setLoading("");
     }
   };
@@ -420,6 +464,7 @@ function AuthModal({ mode, onClose, onEnter }) {
     setLoading("github");
     setError("");
     try {
+      queueFirstRunProfile();
       const { supabase } = await import("../lib/supabase.js");
       const { error: err } = await supabase.auth.signInWithOAuth({
         provider: "github",
@@ -427,7 +472,8 @@ function AuthModal({ mode, onClose, onEnter }) {
       });
       if (err) throw err;
     } catch (err) {
-      setError(err.message || "GitHub sign-in failed. Make sure GitHub OAuth is enabled in Supabase.");
+      clearFirstRunProfile();
+      setError(err.message || "GitHub sign-in failed. Enable and configure the GitHub provider in Supabase Auth.");
       setLoading("");
     }
   };
@@ -438,6 +484,7 @@ function AuthModal({ mode, onClose, onEnter }) {
     setLoading("email");
     setError("");
     try {
+      queueFirstRunProfile();
       const { supabase } = await import("../lib/supabase.js");
       const { error: err } = await supabase.auth.signInWithOtp({
         email,
@@ -447,7 +494,8 @@ function AuthModal({ mode, onClose, onEnter }) {
       setEmailSent(true);
       setLoading("");
     } catch (err) {
-      setError(err.message || "Failed to send magic link. Please try again.");
+      clearFirstRunProfile();
+      setError(err.message || "Failed to send magic link. Check email auth in Supabase.");
       setLoading("");
     }
   };
@@ -463,45 +511,63 @@ function AuthModal({ mode, onClose, onEnter }) {
         aria-modal="true"
         aria-labelledby="auth-title"
       >
-        <button className="icon-button auth-close" type="button" onClick={onClose} aria-label="Close sign in"><X /></button>
-        <span className="auth-mark">
-          <img src={logoLightTransparent} alt="Recall Logo" style={{ width: "30px", height: "30px", objectFit: "contain" }} />
-        </span>
-        <h2 id="auth-title">{mode === "create" ? "Create your memory space" : "Welcome back"}</h2>
+        <button className="auth-close" type="button" onClick={onClose} aria-label="Close sign in"><X /></button>
+        <div className="auth-modal-inner">
+          <span className="auth-mark">
+            <img src={logoLightTransparent} alt="Recall Logo" style={{ width: "28px", height: "28px", objectFit: "contain" }} />
+          </span>
+          <h2 id="auth-title">{mode === "create" ? "Create your memory space" : "Welcome back"}</h2>
+          <p className="auth-modal-subtitle">
+            {mode === "create"
+              ? "Your private, AI-assisted second memory."
+              : "Sign in to continue to your space."}
+          </p>
 
-        {emailSent ? (
-          <div style={{ textAlign: "center", padding: "1rem 0" }}>
-            <p style={{ fontSize: "1.1rem", marginBottom: "0.5rem" }}>✉️ Check your inbox</p>
-            <p style={{ opacity: 0.7 }}>We sent a magic link to <strong>{email}</strong>. Click it to sign in.</p>
-            <button className="quiet-button" style={{ marginTop: "1.25rem" }} type="button" onClick={() => { setEmailSent(false); setEmailStep(false); }}>Use a different method</button>
-          </div>
-        ) : emailStep ? (
-          <form onSubmit={handleEmail}>
-            <label>
-              Email address
-              <input autoFocus type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" required />
-            </label>
-            {error && <p style={{ color: "#f87171", fontSize: "0.85rem", margin: "0.5rem 0" }}>{error}</p>}
-            <button className="primary-button" disabled={!!loading}>
-              {loading === "email" ? "Sending magic link…" : "Send magic link"}
-            </button>
-            <button className="quiet-button" type="button" onClick={() => { setEmailStep(false); setError(""); }}>Back to all methods</button>
-          </form>
-        ) : (
-          <div className="auth-methods">
-            <button type="button" onClick={handleGoogle} disabled={!!loading}>
-              <GoogleLogo weight="bold" />{loading === "google" ? "Connecting…" : "Continue with Google"}
-            </button>
-            <button type="button" onClick={handleGithub} disabled={!!loading}>
-              <GithubLogo weight="bold" />{loading === "github" ? "Connecting…" : "Continue with GitHub"}
-            </button>
-            <button type="button" onClick={() => setEmailStep(true)} disabled={!!loading}>
-              Continue with email
-            </button>
-            {error && <p style={{ color: "#f87171", fontSize: "0.85rem", margin: "0.5rem 0", textAlign: "center" }}>{error}</p>}
-          </div>
-        )}
-        <small>Your data is stored securely in your personal Recall space.</small>
+          {emailSent ? (
+            <div className="auth-sent-state">
+              <div className="auth-sent-icon">
+                <Check weight="bold" />
+              </div>
+              <h3>Check your inbox</h3>
+              <p>We sent a magic link to <strong>{email}</strong>. Click it to sign in — no password needed.</p>
+              <button className="quiet-button" style={{ width: "100%", borderRadius: "12px", color: "var(--muted)", fontSize: "13px" }} type="button" onClick={() => { setEmailSent(false); setEmailStep(false); }}>
+                Use a different method
+              </button>
+            </div>
+          ) : emailStep ? (
+            <form onSubmit={handleEmail}>
+              <label>
+                Email address
+                <input autoFocus type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" required />
+              </label>
+              {error && <p style={{ color: "#f87171", fontSize: "0.85rem", margin: "0" }}>{error}</p>}
+              <button className="primary-button" disabled={!!loading}>
+                {loading === "email" ? "Sending magic link…" : "Send magic link"}
+              </button>
+              <button className="quiet-button" type="button" onClick={() => { setEmailStep(false); setError(""); }}>Back to all methods</button>
+            </form>
+          ) : (
+            <>
+              <div className="auth-methods">
+                <button type="button" className="auth-btn-google" onClick={handleGoogle} disabled={!!loading}>
+                  <GoogleLogo weight="bold" />{loading === "google" ? "Connecting…" : "Continue with Google"}
+                </button>
+                <button type="button" className="auth-btn-github" onClick={handleGithub} disabled={!!loading}>
+                  <GithubLogo weight="bold" />{loading === "github" ? "Connecting…" : "Continue with GitHub"}
+                </button>
+              </div>
+              <div className="auth-divider">or</div>
+              <div className="auth-methods" style={{ marginBottom: 0 }}>
+                <button type="button" className="auth-btn-email" onClick={() => setEmailStep(true)} disabled={!!loading}>
+                  Continue with email
+                </button>
+              </div>
+              {error && <p style={{ color: "#f87171", fontSize: "0.85rem", margin: "0.75rem 0 0", textAlign: "center" }}>{error}</p>}
+            </>
+          )}
+
+          <small>Your data is stored securely in your personal Recall space.</small>
+        </div>
       </motion.section>
     </div>
   );
