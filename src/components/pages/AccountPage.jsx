@@ -17,7 +17,8 @@ import {
   Archive,
   Warning,
   X,
-  Check
+  Check,
+  User
 } from "@phosphor-icons/react";
 import { supabase } from "../../lib/supabase.js";
 import { apiFetch } from "../../lib/api.js";
