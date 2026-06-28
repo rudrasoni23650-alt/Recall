@@ -27,6 +27,8 @@
   ],
   "host_permissions": [
     "http://localhost:5173/*",
-    "http://localhost:5001/*"
+    "http://localhost:5001/*",
+    "https://recall-backend-9elu.onrender.com/*",
+    "https://*.vercel.app/*"
   ]
 }

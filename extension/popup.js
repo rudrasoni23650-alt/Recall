@@ -53,7 +53,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       };
 
       try {
-        const response = await fetch("http://localhost:5001/api/extension/capture", {
+        const response = await fetch("https://recall-backend-9elu.onrender.com/api/extension/capture", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
