@@ -94,16 +94,22 @@
       "time": "11:30 AM",
       "source": "Launch brief",
       "sourceId": "launch-core",
-      "done": false
-    },
-    {
-      "id": "reminder-2",
-      "title": "Add proof points from customer interviews",
-      "due": "Tomorrow",
-      "time": "9:00 AM",
-      "source": "Maya Chen interview",
-      "sourceId": "customer-interview",
-      "done": false
+      "done": true
     }
-  ]
+  ],
+  "profile": {
+    "name": "Demo User",
+    "googleConnected": false,
+    "githubConnected": true
+  },
+  "preferences": {
+    "autoSummarize": true,
+    "showInsights": true,
+    "emailHighlights": false,
+    "compactCards": false,
+    "mfa": false,
+    "theme": "petrol",
+    "bio": "AI-assisted second memory space. Capturing articles, notes, and reminders."
+  },
+  "spaces": []
 }

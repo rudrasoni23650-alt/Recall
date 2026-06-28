@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Recall Web Clipper",
+  "version": "1.0.0",
+  "description": "Quickly save web pages, links, and text selections to your Recall space.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": [
+    "contextMenus",
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://localhost:5173/*",
+    "http://localhost:5001/*"
+  ]
+}

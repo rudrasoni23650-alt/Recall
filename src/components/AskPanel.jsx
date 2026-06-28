@@ -107,7 +107,7 @@ export function AskPanel({ memories, onSelectMemory, onClose }) {
       >
         <header>
           <div>
-            <Sparkle weight="fill" />
+            <Sparkle size={20} weight="fill" />
             <span>Ask Recall</span>
           </div>
           <button className="icon-button" onClick={onClose} aria-label="Close Ask Recall">
@@ -117,7 +117,7 @@ export function AskPanel({ memories, onSelectMemory, onClose }) {
         <div className="ask-body">
           {messages.length === 0 ? (
             <div className="ask-empty">
-              <Sparkle weight="duotone" />
+              <Sparkle size={48} weight="duotone" />
               <h2>Ask what your memories know.</h2>
               <p>Try “What themes keep appearing in my launch research?”</p>
             </div>

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Recall Web Clipper</title>
+    <style>
+      body { width: 320px; font-family: -apple-system, system-ui, sans-serif; padding: 16px; margin: 0; background: #083c3e; color: #fff; }
+      h1 { font-size: 16px; margin: 0 0 16px; display: flex; align-items: center; gap: 8px; color: #fff; }
+      .token-section { display: flex; flex-direction: column; gap: 8px; }
+      .capture-section { display: none; flex-direction: column; gap: 12px; }
+      input, textarea { width: 100%; box-sizing: border-box; padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.2); color: #fff; font-family: inherit; }
+      button { background: #df644a; color: #fff; border: 0; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 500; }
+      button:hover { background: #c5533c; }
+      .status { font-size: 13px; color: #aed2cd; margin-top: 8px; }
+    </style>
+  </head>
+  <body>
+    <h1>Recall Clipper</h1>
+
+    <div id="token-section" class="token-section">
+      <label>Enter your API Token from Account page:</label>
+      <input type="password" id="token-input" placeholder="Recall token...">
+      <button id="save-token">Save Token</button>
+    </div>
+
+    <div id="capture-section" class="capture-section">
+      <textarea id="page-note" placeholder="Add a note (optional)..." rows="3"></textarea>
+      <button id="save-page">Save Page to Recall</button>
+      <div id="status" class="status"></div>
+      <button id="change-token" style="background: transparent; color: #aed2cd; font-size: 11px; margin-top: 8px;">Update API Token</button>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

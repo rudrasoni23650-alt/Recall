@@ -1,39 +1,80 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
-import { Bell, FileArrowUp, FileText, Image, Link, Microphone, Sparkle, Stop, X } from "@phosphor-icons/react";
+import {
+  Bell, FileArrowUp, FileText, FilePdf, Image, Link,
+  Microphone, Quotes, Sparkle, Stop, VideoCamera, X,
+  CheckSquare, Highlighter, Article,
+} from "@phosphor-icons/react";
+import { supabase } from "../lib/supabase.js";
+import { toYYYYMMDD, toHHMM, formatDue, formatTime } from "../lib/dateUtils.js";
+import { DatePicker, TimePicker } from "./CustomPickers.jsx";
 
-const types = [
-  { id: "note", label: "Note", icon: FileText },
-  { id: "link", label: "Link", icon: Link },
-  { id: "image", label: "Upload", icon: Image },
-  { id: "voice", label: "Voice", icon: Microphone },
-  { id: "reminder", label: "Reminder", icon: Bell },
+const TYPES = [
+  { id: "note",       label: "Note",        icon: FileText,    group: "write" },
+  { id: "link",       label: "Link",         icon: Link,        group: "save" },
+  { id: "article",    label: "Article",      icon: Article,     group: "save" },
+  { id: "image",      label: "Image",        icon: Image,       group: "save" },
+  { id: "screenshot", label: "Screenshot",   icon: Image,       group: "save" },
+  { id: "pdf",        label: "PDF / File",   icon: FilePdf,     group: "save" },
+  { id: "video",      label: "Video",        icon: VideoCamera, group: "save" },
+  { id: "quote",      label: "Quote",        icon: Quotes,      group: "write" },
+  { id: "highlight",  label: "Highlight",    icon: Highlighter, group: "write" },
+  { id: "todo",       label: "To-do",        icon: CheckSquare, group: "write" },
+  { id: "voice",      label: "Voice",        icon: Microphone,  group: "record" },
+  { id: "reminder",   label: "Reminder",     icon: Bell,        group: "action" },
 ];
 
-export function CaptureModal({ onClose, onSave }) {
-  const [type, setType] = useState("note");
-  const [text, setText] = useState("");
-  const [title, setTitle] = useState("");
-  const [file, setFile] = useState(null);
-  const [recording, setRecording] = useState(false);
-  const [audioUrl, setAudioUrl] = useState("");
-  const [elapsed, setElapsed] = useState(0);
-  const [due, setDue] = useState("Today");
-  const [time, setTime] = useState("9:00 AM");
-  const [processing, setProcessing] = useState(false);
-  const [error, setError] = useState("");
-  const recorderRef = useRef(null);
-  const streamRef = useRef(null);
-  const chunksRef = useRef([]);
+const URL_RE = /^https?:\/\//i;
 
+// Types that use the drop-zone for file upload
+const FILE_TYPES = new Set(["image", "screenshot", "pdf"]);
+// Types that accept a URL field
+const LINK_TYPES = new Set(["link", "article", "video"]);
+// Types that use a plain textarea
+const TEXT_TYPES = new Set(["note", "quote", "highlight", "todo"]);
+
+function detectType(raw) {
+  if (!raw) return null;
+  const t = raw.trim();
+  if (URL_RE.test(t)) {
+    const lc = t.toLowerCase();
+    if (/youtube\.com|youtu\.be|vimeo\.com/i.test(t)) return "video";
+    // default for any URL is "link"; user can switch to "article"
+    return "link";
+  }
+  return "note";
+}
+
+export function CaptureModal({ onClose, onSave }) {
+  const [type, setType]           = useState("note");
+  const [text, setText]           = useState("");
+  const [title, setTitle]         = useState("");
+  const [file, setFile]           = useState(null);
+  const [recording, setRecording] = useState(false);
+  const [audioUrl, setAudioUrl]   = useState("");
+  const [elapsed, setElapsed]     = useState(0);
+  const [due, setDue]             = useState(toYYYYMMDD("Today"));
+  const [time, setTime]           = useState(toHHMM("9:00 AM"));
+  const [processing, setProcessing] = useState(false);
+  const [fetchingMeta, setFetchingMeta] = useState(false);
+  const [error, setError]         = useState("");
+  const [activeGroup, setActiveGroup] = useState("write");
+
+  const recorderRef = useRef(null);
+  const streamRef   = useRef(null);
+  const chunksRef   = useRef([]);
+  const metaTimerRef = useRef(null);
+
+  // Recording timer
   useEffect(() => {
     if (!recording) return undefined;
-    const timer = window.setInterval(() => setElapsed((value) => value + 1), 1000);
+    const timer = window.setInterval(() => setElapsed(v => v + 1), 1000);
     return () => window.clearInterval(timer);
   }, [recording]);
 
+  // Cleanup blob URLs on unmount
   useEffect(() => () => {
-    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current?.getTracks().forEach(t => t.stop());
     if (audioUrl) URL.revokeObjectURL(audioUrl);
   }, [audioUrl]);
 
@@ -41,110 +82,199 @@ export function CaptureModal({ onClose, onSave }) {
     if (recording) recorderRef.current?.stop();
     setType(nextType);
     setError("");
+    setActiveGroup(TYPES.find(t => t.id === nextType)?.group || "write");
   };
 
+  // Auto-detect type from pasted text
+  const handleTextChange = (val) => {
+    setText(val);
+    setError("");
+    const detected = detectType(val);
+    if (detected && (type === "note" || LINK_TYPES.has(type))) {
+      setType(detected);
+      setActiveGroup(TYPES.find(t => t.id === detected)?.group || "write");
+    }
+  };
+
+  // Debounced URL metadata fetch
+  const handleUrlChange = (val) => {
+    setText(val);
+    setError("");
+    if (metaTimerRef.current) clearTimeout(metaTimerRef.current);
+    if (!URL_RE.test(val.trim())) return;
+    metaTimerRef.current = setTimeout(async () => {
+      try {
+        setFetchingMeta(true);
+        const res = await fetch("/api/metadata/extract", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: val.trim() }),
+        });
+        const data = await res.json();
+        if (data.success && data.metadata) {
+          const m = data.metadata;
+          if (m.title && !title) setTitle(m.title);
+        }
+      } catch { /* silent */ } finally {
+        setFetchingMeta(false);
+      }
+    }, 900);
+  };
+
+  // ── Voice recording ──────────────────────────────────────────────────────────
   const startRecording = async () => {
     setError("");
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
-      setError("Browser recording is unavailable here. You can still upload an audio file.");
+      setError("Browser recording unavailable. Upload an audio file instead.");
       return;
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
-      streamRef.current = stream;
+      streamRef.current  = stream;
       recorderRef.current = recorder;
-      chunksRef.current = [];
-      recorder.ondataavailable = (event) => event.data.size && chunksRef.current.push(event.data);
+      chunksRef.current  = [];
+      recorder.ondataavailable = (e) => e.data.size && chunksRef.current.push(e.data);
       recorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
         setAudioUrl(URL.createObjectURL(blob));
-        stream.getTracks().forEach((track) => track.stop());
+        stream.getTracks().forEach(t => t.stop());
         setRecording(false);
       };
       recorder.start();
       setElapsed(0);
       setRecording(true);
     } catch {
-      setError("Microphone access was not granted. Choose Upload to add an existing recording instead.");
+      setError("Microphone access denied. Choose Upload to add an existing recording.");
     }
   };
 
-  const stopRecording = () => recorderRef.current?.state === "recording" && recorderRef.current.stop();
-  const formattedElapsed = `${String(Math.floor(elapsed / 60)).padStart(2, "0")}:${String(elapsed % 60).padStart(2, "0")}`;
-  const validUrl = type !== "link" || /^https?:\/\//i.test(text.trim());
-  const canSave = type === "image" ? !!file : type === "voice" ? !!audioUrl : !!text.trim() && validUrl;
+  const stopRecording = () =>
+    recorderRef.current?.state === "recording" && recorderRef.current.stop();
 
-  const uploadFile = async (fileObject) => {
+  const formattedElapsed = `${String(Math.floor(elapsed / 60)).padStart(2, "0")}:${String(elapsed % 60).padStart(2, "0")}`;
+
+  // ── Validation ───────────────────────────────────────────────────────────────
+  const isFileType  = FILE_TYPES.has(type);
+  const isLinkType  = LINK_TYPES.has(type);
+  const isTextType  = TEXT_TYPES.has(type);
+  const isVoice     = type === "voice";
+  const isReminder  = type === "reminder";
+
+  const validUrl = !isLinkType || URL_RE.test(text.trim());
+  const canSave  = isFileType
+    ? !!file
+    : isVoice
+    ? !!audioUrl
+    : !!text.trim() && validUrl;
+
+  // ── File upload helper ───────────────────────────────────────────────────────
+  const uploadFile = async (fileObj) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = async () => {
-        const base64Data = reader.result.split(',')[1];
         try {
-          const res = await fetch('/api/upload', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
+          const { data: sessionData } = await supabase.auth.getSession();
+          const token = sessionData?.session?.access_token;
+          
+          const headers = { "Content-Type": "application/json" };
+          if (token) headers["Authorization"] = `Bearer ${token}`;
+
+          const res = await fetch("/api/upload", {
+            method: "POST",
+            headers,
             body: JSON.stringify({
-              fileName: fileObject.name,
-              fileType: fileObject.type,
-              base64Data
-            })
+              fileName: fileObj.name,
+              fileType: fileObj.type,
+              base64Data: reader.result.split(",")[1],
+            }),
           });
           const data = await res.json();
-          if (data.success && data.url) {
-            resolve(data.url);
-          } else {
-            reject(new Error(data.error || "Upload failed"));
-          }
-        } catch (err) {
-          reject(err);
-        }
+          if (data.success && data.url) resolve(data.url);
+          else reject(new Error(data.error || "Upload failed"));
+        } catch (err) { reject(err); }
       };
-      reader.onerror = (err) => reject(err);
-      reader.readAsDataURL(fileObject);
+      reader.onerror = reject;
+      reader.readAsDataURL(fileObj);
     });
   };
 
+  // ── Save ─────────────────────────────────────────────────────────────────────
   const save = async () => {
     if (!canSave) {
-      setError(type === "link" ? "Paste a complete link beginning with http:// or https://." : "Add something before saving this memory.");
+      setError(
+        isLinkType  ? "Paste a complete URL starting with http:// or https://." :
+        isFileType  ? "Choose a file to upload." :
+        "Add some content before saving."
+      );
       return;
     }
     setProcessing(true);
     const cleanText = text.trim();
-    const memoryTitle = title.trim() || (type === "link" ? new URL(cleanText).hostname.replace("www.", "") : type === "image" ? file.name : type === "voice" ? "Recorded thought" : cleanText.split(/\n|\.|:/)[0].slice(0, 64));
+
+    // Build a title if none provided
+    const autoTitle =
+      isLinkType  ? (() => { try { return new URL(cleanText).hostname.replace("www.", ""); } catch { return cleanText.slice(0, 64); } })() :
+      isFileType  ? (file?.name || "Uploaded file") :
+      isVoice     ? "Recorded thought" :
+      type === "quote" ? `"${cleanText.slice(0, 60)}…"` :
+      type === "todo"  ? cleanText.split(/\n/)[0].slice(0, 64) :
+      cleanText.split(/\n|\.|:/)[0].slice(0, 64);
+
+    const memoryTitle = title.trim() || autoTitle;
 
     let finalImageUrl = undefined;
     let finalAudioUrl = audioUrl;
+    let finalFileUrl  = undefined;
 
     try {
-      if (type === "image" && file) {
-        finalImageUrl = await uploadFile(file);
-      } else if (type === "voice" && audioUrl) {
-        const blob = await fetch(audioUrl).then((r) => r.blob());
-        const audioFile = new File([blob], `voice-recording-${Date.now()}.wav`, { type: blob.type || "audio/wav" });
+      if (isFileType && file) {
+        const uploadedUrl = await uploadFile(file);
+        if (type === "pdf") finalFileUrl  = uploadedUrl;
+        else                finalImageUrl = uploadedUrl;
+      } else if (isVoice && audioUrl) {
+        const blob = await fetch(audioUrl).then(r => r.blob());
+        const audioFile = new File([blob], `voice-${Date.now()}.wav`, { type: blob.type || "audio/wav" });
         finalAudioUrl = await uploadFile(audioFile);
       }
     } catch (err) {
       console.error("Upload error:", err);
-      setError("Failed to upload the file to server.");
+      setError("File upload failed. Please try again.");
       setProcessing(false);
       return;
     }
 
+    // Build excerpt
+    const excerpt =
+      isLinkType  ? `Saved from ${(() => { try { return new URL(cleanText).hostname; } catch { return cleanText; } })()}` :
+      isFileType  ? `Uploaded ${file?.name} · ${Math.max(1, Math.round((file?.size || 0) / 1024))} KB` :
+      isVoice     ? `Recorded voice note · ${formattedElapsed}` :
+      type === "quote" ? cleanText :
+      type === "todo"  ? cleanText :
+      cleanText;
+
+    // Determine capture source label
+    const captureSource = "web_app";
+
     window.setTimeout(() => onSave({
-      type: type === "reminder" ? "note" : type,
-      title: memoryTitle,
-      excerpt: type === "link" ? `Saved link from ${new URL(cleanText).hostname}` : type === "image" ? `Uploaded ${file.name} · ${Math.max(1, Math.round(file.size / 1024))} KB` : type === "voice" ? `Recorded voice note · ${formattedElapsed}` : cleanText.slice(0, 140),
-      url: type === "link" ? cleanText : undefined,
-      fileName: file?.name,
-      audioUrl: finalAudioUrl,
-      imageUrl: finalImageUrl,
-      reminder: type === "reminder" ? { title: cleanText, due, time } : undefined,
+      type:          isReminder ? "note" : type,
+      title:         memoryTitle,
+      excerpt,
+      url:           isLinkType ? cleanText : undefined,
+      fileName:      file?.name,
+      audioUrl:      finalAudioUrl || undefined,
+      imageUrl:      finalImageUrl,
+      fileUrl:       finalFileUrl,
+      captureSource,
+      processingStatus: (isLinkType || isFileType) ? "pending" : "completed",
+      reminder: isReminder
+        ? { title: cleanText, due: formatDue(due), time: formatTime(time) }
+        : undefined,
     }), 780);
   };
+
+  const groups = [...new Set(TYPES.map(t => t.group))];
+  const visibleTypes = TYPES.filter(t => t.group === activeGroup);
 
   return (
     <motion.div
@@ -154,7 +284,7 @@ export function CaptureModal({ onClose, onSave }) {
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
       role="presentation"
-      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
       <motion.section
         className="modal capture-modal"
@@ -173,34 +303,94 @@ export function CaptureModal({ onClose, onSave }) {
           </div>
           <button className="icon-button" onClick={onClose} aria-label="Close capture"><X /></button>
         </header>
+
+        {/* Group tabs */}
+        <div className="capture-group-tabs">
+          {groups.map(g => (
+            <button
+              key={g}
+              className={activeGroup === g ? "is-active" : ""}
+              onClick={() => { setActiveGroup(g); setType(TYPES.find(t => t.group === g)?.id || "note"); setError(""); }}
+            >
+              {g.charAt(0).toUpperCase() + g.slice(1)}
+            </button>
+          ))}
+        </div>
+
+        {/* Type chips */}
         <div className="capture-types">
-          {types.map(({ id, label, icon: Icon }) => (
-            <button className={type === id ? "is-active" : ""} key={id} onClick={() => changeType(id)}>
+          {visibleTypes.map(({ id, label, icon: Icon }) => (
+            <button
+              className={type === id ? "is-active" : ""}
+              key={id}
+              onClick={() => changeType(id)}
+            >
               <Icon weight="duotone" />
               {label}
             </button>
           ))}
         </div>
+
         <div className="capture-fields">
-          {type !== "voice" && type !== "image" ? (
+          {/* Text / URL input */}
+          {(isTextType || isLinkType || isReminder) && (
             <label className="capture-main-field">
-              {type === "link" ? "Web address" : type === "reminder" ? "What should we remind you about?" : "Your thought"}
+              {isLinkType  ? (type === "video" ? "Video URL" : "Web address") :
+               isReminder  ? "What should we remind you about?" :
+               type === "quote" ? "The quote" :
+               type === "highlight" ? "Highlighted text" :
+               type === "todo"   ? "What needs to be done?" :
+               "Your thought"}
               {type === "note" ? (
-                <textarea autoFocus placeholder="Write without organizing…" value={text} onChange={(event) => setText(event.target.value)} />
+                <textarea
+                  autoFocus
+                  placeholder="Write without organizing…"
+                  value={text}
+                  onChange={(e) => handleTextChange(e.target.value)}
+                />
               ) : (
-                <input autoFocus type={type === "link" ? "url" : "text"} placeholder={type === "link" ? "https://example.com/article" : "Follow up on the launch narrative"} value={text} onChange={(event) => { setText(event.target.value); setError(""); }} />
+                <input
+                  autoFocus
+                  type={isLinkType ? "url" : "text"}
+                  placeholder={
+                    isLinkType   ? "https://example.com/article" :
+                    isReminder   ? "Follow up on the launch narrative" :
+                    type === "quote" ? "The exact words you want to remember" :
+                    type === "highlight" ? "Selected text from article or document" :
+                    "Next action item"
+                  }
+                  value={text}
+                  onChange={(e) => isLinkType ? handleUrlChange(e.target.value) : handleTextChange(e.target.value)}
+                />
+              )}
+              {fetchingMeta && (
+                <span className="capture-meta-loading">
+                  <Sparkle weight="fill" /> Fetching page info…
+                </span>
               )}
             </label>
-          ) : null}
-          {type === "image" ? (
-            <label className={file ? "drop-zone has-file" : "drop-zone"} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); setFile(event.dataTransfer.files[0] ?? null); }}>
-              <input type="file" accept="image/*,.pdf,.txt,.md" onChange={(event) => setFile(event.target.files[0] ?? null)} />
+          )}
+
+          {/* File drop-zone */}
+          {isFileType && (
+            <label
+              className={file ? "drop-zone has-file" : "drop-zone"}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => { e.preventDefault(); setFile(e.dataTransfer.files[0] ?? null); }}
+            >
+              <input
+                type="file"
+                accept={type === "pdf" ? ".pdf,.doc,.docx,.txt,.md" : "image/*"}
+                onChange={(e) => setFile(e.target.files[0] ?? null)}
+              />
               <FileArrowUp weight="duotone" />
-              <strong>{file ? file.name : "Drop a file here"}</strong>
-              <span>{file ? `${Math.max(1, Math.round(file.size / 1024))} KB · Ready to save` : "or click to choose an image, PDF, or document"}</span>
+              <strong>{file ? file.name : type === "pdf" ? "Drop a PDF or document" : "Drop an image or screenshot"}</strong>
+              <span>{file ? `${Math.max(1, Math.round(file.size / 1024))} KB · Ready to save` : "or click to choose a file"}</span>
             </label>
-          ) : null}
-          {type === "voice" ? (
+          )}
+
+          {/* Voice recorder */}
+          {isVoice && (
             <div className={recording ? "recorder is-recording" : "recorder"}>
               <button onClick={recording ? stopRecording : startRecording}>
                 {recording ? <Stop weight="fill" /> : <Microphone weight="fill" />}
@@ -210,43 +400,50 @@ export function CaptureModal({ onClose, onSave }) {
                 <span>{recording ? "Tap stop when the thought is complete." : audioUrl ? "Listen back before saving." : "Your browser will ask for microphone access."}</span>
               </div>
               <div className="wave-bars" aria-hidden="true">
-                {Array.from({ length: 18 }, (_, index) => <i key={index} />)}
+                {Array.from({ length: 18 }, (_, i) => <i key={i} />)}
               </div>
               {audioUrl ? <audio controls src={audioUrl} /> : null}
             </div>
-          ) : null}
-          {type === "reminder" ? (
+          )}
+
+          {/* Reminder time pickers */}
+          {isReminder && (
             <div className="reminder-fields">
-              <label>
+              <label style={{ position: "relative", overflow: "visible" }}>
                 When
-                <select value={due} onChange={(event) => setDue(event.target.value)}>
-                  <option>Today</option>
-                  <option>Tomorrow</option>
-                  <option>Next week</option>
-                </select>
+                <DatePicker value={due} onChange={setDue} />
               </label>
               <label>
                 Time
-                <input value={time} onChange={(event) => setTime(event.target.value)} placeholder="9:00 AM" />
+                <TimePicker value={time} onChange={setTime} />
               </label>
             </div>
-          ) : null}
-          {type !== "reminder" ? (
+          )}
+
+          {/* Optional title */}
+          {!isReminder && (
             <label className="optional-title">
               Title <span>optional</span>
-              <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Recall can create one for you" />
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Recall can create one for you"
+              />
             </label>
-          ) : null}
+          )}
         </div>
+
         {error ? <p className="capture-error" role="alert">{error}</p> : null}
+
         <div className="capture-insight">
           <Sparkle weight="fill" />
           <span><strong>Recall will organize this.</strong> It will suggest a title, summary, related memories, and any useful next step.</span>
         </div>
+
         <footer>
-          <span>{processing ? "Understanding your capture…" : "Saved locally in this browser"}</span>
+          <span>{processing ? "Understanding your capture…" : (isLinkType || isFileType) ? "Recall will process this after saving" : "Saved to your space"}</span>
           <button className="primary-button" onClick={save} disabled={processing}>
-            {processing ? "Organizing…" : type === "reminder" ? "Create reminder" : "Save memory"}
+            {processing ? "Organizing…" : isReminder ? "Create reminder" : "Save memory"}
           </button>
         </footer>
       </motion.section>

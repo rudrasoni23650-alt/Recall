@@ -10,12 +10,38 @@ import { RemindersPage } from "./pages/RemindersPage.jsx";
 import { ProfilePage } from "./pages/ProfilePage.jsx";
 import { AccountPage } from "./pages/AccountPage.jsx";
 import { MemoryCard } from "./MemoryCard.jsx";
+import { FocusMode } from "./FocusMode.jsx";
+import { PencilSimple } from "@phosphor-icons/react";
 
 const pageComponents = { home: HomePage, memories: MemoriesPage, spaces: SpacesPage, reminders: RemindersPage, profile: ProfilePage, account: AccountPage };
 
 export function Workspace(props) {
   const [profileOpen, setProfileOpen] = useState(false);
+  const [focusModeOpen, setFocusModeOpen] = useState(false);
   const Page = pageComponents[props.activePage] ?? HomePage;
+
+  const todayDateStr = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date());
+  
+  const todayReminders = (props.reminders || []).filter(r => r.due === "Today" && !r.done);
+  const groupedReminders = {};
+  todayReminders.forEach(r => {
+    const t = r.time || "All Day";
+    if (!groupedReminders[t]) groupedReminders[t] = [];
+    groupedReminders[t].push(r);
+  });
+
+  const parseTime = (timeStr) => {
+    if (!timeStr || timeStr === "All Day") return 0;
+    const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (!match) return 0;
+    let [_, h, m, ampm] = match;
+    h = parseInt(h, 10);
+    if (ampm.toUpperCase() === 'PM' && h !== 12) h += 12;
+    if (ampm.toUpperCase() === 'AM' && h === 12) h = 24;
+    return h * 60 + parseInt(m, 10);
+  };
+
+  const sortedTimes = Object.keys(groupedReminders).sort((a, b) => parseTime(a) - parseTime(b));
 
   return (
     <main className="app-shell">
@@ -25,9 +51,14 @@ export function Workspace(props) {
           <button className="search-trigger" type="button" onClick={props.onSearch}>
             <MagnifyingGlass size={21} /><span>Search your memories</span><kbd>⌘ K</kbd>
           </button>
-          <button className="capture-button" type="button" onClick={props.onCapture}>
-            <span className="capture-dot"><Plus size={14} weight="bold" /></span><span>Capture</span>
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button className="page-action-button" type="button" onClick={() => setFocusModeOpen(true)}>
+              <PencilSimple size={16} weight="bold" /> Focus
+            </button>
+            <button className="capture-button" type="button" onClick={props.onCapture}>
+              <span className="capture-dot"><Plus size={14} weight="bold" /></span><span>Capture</span>
+            </button>
+          </div>
         </header>
         <AnimatePresence mode="wait">
           <motion.div
@@ -36,6 +67,7 @@ export function Workspace(props) {
             animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
             exit={{ opacity: 0, y: -15, filter: "blur(5px)" }}
             transition={{ type: "spring", stiffness: 300, damping: 24, mass: 0.8 }}
+            style={{ minWidth: 0, width: "100%", overflowX: "hidden" }}
           >
             <Page {...props} />
           </motion.div>
@@ -44,9 +76,22 @@ export function Workspace(props) {
       <aside className="context-rail">
         <section className="context-section context-today">
           <div className="context-heading"><h2>Today</h2><CalendarBlank size={22} /></div>
-          <p className="context-date">Friday, June 20</p>
-          <div className="agenda-item"><time>10:00 AM</time><span /><p><strong>Deep work</strong><small>Brief & messaging</small></p></div>
-          <div className="agenda-item"><time>1:30 PM</time><span /><p><strong>User interview</strong><small>Maya Chen</small></p></div>
+          <p className="context-date">{todayDateStr}</p>
+          {sortedTimes.length > 0 ? (
+            sortedTimes.map(time => {
+              const items = groupedReminders[time];
+              const titles = items.map(i => i.title).join(", ");
+              return (
+                <div className="agenda-item" key={time}>
+                  <time>{time}</time>
+                  <span />
+                  <p><strong>{titles}</strong></p>
+                </div>
+              );
+            })
+          ) : (
+            <p className="rail-empty">No agenda for today.</p>
+          )}
         </section>
         <section className="context-section">
           <div className="context-heading"><h2>Reminders</h2><span>{props.reminders.filter((item) => !item.done).length}</span></div>
@@ -61,12 +106,23 @@ export function Workspace(props) {
         </section>
         <section className="context-section related-section">
           <div className="context-heading"><h2>Related memory</h2></div>
-          {props.memories.length ? <MemoryCard memory={props.memories[1] ?? props.memories[0]} variant="compact" context="Related to today" onSelect={props.onSelectMemory} /> : <p className="rail-empty">Related memories will appear here.</p>}
+          {props.memories.length ? <MemoryCard memory={props.memories[1] ?? props.memories[0]} variant="compact" context="Related to today" onSelect={props.onSelectMemory} onEdit={props.onEditMemory} /> : <p className="rail-empty">Related memories will appear here.</p>}
         </section>
         <button className="mobile-ask" type="button" onClick={props.onAsk}><Sparkle weight="fill" /> Ask Recall</button>
       </aside>
       <MobileNav {...props} />
       {profileOpen ? <button className="profile-scrim" type="button" aria-label="Close profile menu" onClick={() => setProfileOpen(false)} /> : null}
+
+      <AnimatePresence>
+        {focusModeOpen && (
+          <FocusMode 
+            onClose={() => setFocusModeOpen(false)} 
+            onSaveComplete={(mem) => {
+              if (props.onMemoryUpsert) props.onMemoryUpsert(mem);
+            }}
+          />
+        )}
+      </AnimatePresence>
     </main>
   );
 }

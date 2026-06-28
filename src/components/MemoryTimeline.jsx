@@ -13,5 +13,5 @@ export function MemoryTimeline({ memories, onSelectMemory }) {
 
 function MemoryRow({ memory, onSelect }) {
   const Icon = typeIcons[memory.type] ?? FileText;
-  return <button className="memory-row" type="button" onClick={onSelect}><time>{memory.time}</time><span className={`type-icon type-${memory.type}`}><Icon weight="duotone" /></span><span className="memory-row-copy"><span><small>{memory.type}</small>{memory.title}</span><p>{memory.excerpt}</p></span><span className="memory-tag">{memory.tag}</span>{memory.type === "voice" ? <Play className="row-play" weight="fill" /> : <DotsThree className="row-more" weight="bold" />}</button>;
+  return <button className="memory-row" type="button" onClick={onSelect}><time>{memory.time}</time><span className={`type-icon type-${memory.type}`}><Icon weight="duotone" /></span><span className="memory-row-copy"><span><small>{memory.type}</small>{memory.title}</span><p>{memory.summary || memory.excerpt}</p></span><span className="memory-tag">{memory.tag}</span>{memory.type === "voice" ? <Play className="row-play" weight="fill" /> : <DotsThree className="row-more" weight="bold" />}</button>;
 }

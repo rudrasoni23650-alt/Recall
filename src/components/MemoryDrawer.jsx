@@ -1,17 +1,61 @@
-import { useState } from "react";
-import { Archive, ArrowLeft, ArrowSquareOut, Export, FileText, FolderPlus, Image, Link, Plus, Sparkle, Waveform, X } from "@phosphor-icons/react";
+import { useState, useRef, useEffect } from "react";
+import { ArrowLeft, ArrowUpRight, CheckSquare, House, PushPin, Sparkle, Star, Trash, Waveform, X, PencilSimple, Archive, ArrowSquareOut, Export, FileText, FolderPlus, Image, Link, Plus } from "@phosphor-icons/react";
 import { motion } from "motion/react";
+import { ReadingMode } from "./ReadingMode.jsx";
+import { apiFetch } from "../lib/api.js";
+
 
 const TYPE_ICON = { note: FileText, link: Link, image: Image, voice: Waveform };
 
-export function MemoryDrawer({ memory, memories, spaces = [], onLinkMemoryToSpace, onNavigate, onArchive, onClose }) {
+export function MemoryDrawer({ memory, memories, spaces = [], onLinkMemoryToSpace, onNavigate, onArchive, onClose, onPin, onTopOfMind, onEdit, onDelete }) {
   const [history, setHistory] = useState([]);
   const [originalOpen, setOriginalOpen] = useState(false);
   const [showAddSpace, setShowAddSpace] = useState(false);
+  const [readingMode, setReadingMode] = useState(false);
+  const [highlights, setHighlights] = useState([]);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowAddSpace(false);
+      }
+    };
+    if (showAddSpace) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showAddSpace]);
+  
   const connectedSpaces = (spaces || []).filter(space => space.memoryIds?.includes(memory.id));
   const availableSpaces = (spaces || []).filter(space => !space.memoryIds?.includes(memory.id));
   const memoryById = new Map(memories.map((item) => [item.id, item]));
   const sources = (memory.sourceIds ?? []).map((id) => memoryById.get(id)).filter(Boolean);
+
+  useEffect(() => {
+    // Fetch highlights for this memory
+    apiFetch(`/api/memories/${memory.id}/highlights`)
+      .then(res => {
+        if (res.success) setHighlights(res.highlights || []);
+      })
+      .catch(console.error);
+  }, [memory.id]);
+
+  const saveHighlight = async ({ text }) => {
+    try {
+      const res = await apiFetch(`/api/highlights`, {
+        method: "POST",
+        body: JSON.stringify({ memoryId: memory.id, text })
+      });
+      if (res.success && res.highlight) {
+        setHighlights(prev => [res.highlight, ...prev]);
+      }
+    } catch (err) {
+      console.error("Failed to save highlight", err);
+    }
+  };
 
   const navigateTo = (nextMemory) => {
     setHistory((current) => [...current, memory.id]);
@@ -114,7 +158,34 @@ export function MemoryDrawer({ memory, memories, spaces = [], onLinkMemoryToSpac
             ) : null}
             <span>{memory.type} · {memory.dateGroup}</span>
           </div>
-          <button className="icon-button" onClick={onClose} aria-label="Close memory"><X /></button>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            {onEdit && (
+              <button 
+                className="icon-button" 
+                onClick={() => onEdit(memory)} 
+                aria-label="Edit memory"
+                disabled={memory.processingStatus === 'pending'}
+                title={memory.processingStatus === 'pending' ? "Summarizing..." : "Edit memory"}
+              >
+                <PencilSimple />
+              </button>
+            )}
+            {onDelete && (
+              <button 
+                className="icon-button" 
+                onClick={() => {
+                  if (confirm("Are you sure you want to permanently delete this memory?")) {
+                    onDelete(memory.id);
+                  }
+                }} 
+                aria-label="Delete memory"
+                title="Delete memory"
+              >
+                <Trash />
+              </button>
+            )}
+            <button className="icon-button" onClick={onClose} aria-label="Close memory"><X /></button>
+          </div>
         </header>
 
         <h1>{memory.title}</h1>
@@ -145,12 +216,27 @@ export function MemoryDrawer({ memory, memories, spaces = [], onLinkMemoryToSpac
           </div>
         )}
 
-        <section>
-          <h2><Sparkle weight="fill" /> AI summary</h2>
-          <p>
-            This memory connects your focus on trust with the launch narrative. The clearest opportunity is to support the privacy promise with direct customer language and verifiable sources.
-          </p>
-        </section>
+        {/* AI summary section */}
+        {memory.summary && (
+          <section>
+            <h2><Sparkle weight="fill" /> AI summary</h2>
+            <p>{memory.summary}</p>
+          </section>
+        )}
+
+        {/* Highlights section */}
+        {highlights.length > 0 && (
+          <section className="drawer-highlights">
+            <h2><FileText weight="fill" /> Highlights</h2>
+            <div className="highlights-list">
+              {highlights.map(h => (
+                <div key={h.id} className="highlight-item" style={{ borderLeft: `3px solid var(--${h.color || 'yellow'})`, paddingLeft: '12px', marginBottom: '16px' }}>
+                  <p style={{ fontStyle: 'italic', color: 'var(--text)', margin: 0 }}>"{h.text}"</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         <section>
           <h2><Link /> Sources</h2>
@@ -203,37 +289,39 @@ export function MemoryDrawer({ memory, memories, spaces = [], onLinkMemoryToSpac
             {connectedSpaces.length === 0 && <span style={{ color: 'var(--petrol-light)', opacity: 0.7, fontSize: '13px' }}>Not in any spaces yet.</span>}
           </div>
           
-          <div className="drawer-add-space-control" style={{ position: 'relative' }}>
+          <div className="drawer-add-space-control" style={{ position: 'relative' }} ref={dropdownRef}>
             <button className="text-action-button" style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', color: 'var(--coral)', cursor: 'pointer', fontSize: '13px', fontWeight: '500', padding: 0 }} type="button" onClick={() => setShowAddSpace(!showAddSpace)}>
               <Plus /> Add to space
             </button>
             {showAddSpace && (
-              <div className="drawer-space-selector-dropdown" style={{ position: 'absolute', top: '100%', left: 0, background: 'var(--canvas)', border: '1px solid var(--line)', borderRadius: '8px', padding: '8px', zIndex: 10, display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '160px', marginTop: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+              <div className="drawer-space-selector-dropdown" style={{ position: 'absolute', bottom: '100%', left: 0, background: 'var(--canvas)', border: '1px solid var(--line)', borderRadius: '8px', padding: '8px', zIndex: 10, display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '160px', marginBottom: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
                 {availableSpaces.map(space => (
-                  <button type="button" key={space.id} onClick={() => { onLinkMemoryToSpace(memory.id, space.id); setShowAddSpace(false); }} style={{ background: 'none', border: 'none', color: 'var(--text)', textAlign: 'left', padding: '6px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', width: '100%' }}>
+                  <button type="button" key={space.id} onClick={() => { onLinkMemoryToSpace(memory.id, space.id); setShowAddSpace(false); }} style={{ background: 'var(--canvas-deep)', border: '1px solid var(--line)', color: 'var(--text)', textAlign: 'left', padding: '8px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', width: '100%' }}>
                     {space.title}
                   </button>
                 ))}
-                {availableSpaces.length === 0 && <p style={{ fontSize: '12px', margin: 0, padding: '4px 8px', color: 'var(--text)', opacity: 0.6 }}>All spaces connected or no spaces created.</p>}
+                {availableSpaces.length === 0 && <p style={{ fontSize: '12px', margin: 0, padding: '4px 8px', color: 'var(--text)', opacity: 0.6 }}>No spaces available. Create one in the Spaces tab.</p>}
               </div>
             )}
           </div>
         </section>
 
-        <section>
-          <h2>Extracted action</h2>
-          <label className="drawer-task">
-            <input type="checkbox" />
-            <span className="check-ring" />
-            Add one customer quote to the launch brief.
-          </label>
-        </section>
-
         <footer>
           <button className="secondary-button" onClick={exportMemory}><Export /> Export Markdown</button>
+          {(memory.body || memory.plain_text || memory.excerpt) && (
+            <button className="quiet-button" onClick={() => setReadingMode(true)}><FileText /> Read</button>
+          )}
           <button className="quiet-button" onClick={() => onArchive(memory.id)}><Archive /> Archive</button>
         </footer>
       </motion.aside>
+
+      {readingMode && (
+        <ReadingMode 
+          memory={memory} 
+          onClose={() => setReadingMode(false)} 
+          onSaveHighlight={saveHighlight} 
+        />
+      )}
     </motion.div>
   );
 }

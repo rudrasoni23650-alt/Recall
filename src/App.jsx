@@ -6,6 +6,9 @@ import { CaptureModal } from "./components/CaptureModal.jsx";
 import { CommandPalette } from "./components/CommandPalette.jsx";
 import { MemoryDrawer } from "./components/MemoryDrawer.jsx";
 import { AskPanel } from "./components/AskPanel.jsx";
+import { EditMemoryModal } from "./components/EditMemoryModal.jsx";
+import { EditReminderModal } from "./components/EditReminderModal.jsx";
+import { NewReminderModal } from "./components/NewReminderModal.jsx";
 import { supabase } from "./lib/supabase.js";
 import { DemoTourModal } from "./components/DemoTourModal.jsx";
 import demoMoodboardImg from "./assets/privacy-positioning-board.png";
@@ -162,35 +165,27 @@ const DEMO_SPACES = [
 ];
 
 // ─── API helper: attaches Supabase JWT to every request ──────────────────────
-async function apiFetch(path, options = {}) {
-  const { data: sessionData } = await supabase.auth.getSession();
-  const token = sessionData?.session?.access_token;
-
-  const headers = {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...(options.headers || {}),
-  };
-
-  // In production, use VITE_API_URL; in dev, use the Vite proxy (/api → localhost:5001)
-  const baseUrl = import.meta.env.VITE_API_URL || "";
-  const res = await fetch(`${baseUrl}${path}`, { ...options, headers });
-  return res.json();
-}
+import { apiFetch } from "./lib/api.js";
+import { MFAVerificationModal } from "./components/MFAVerificationModal.jsx";
 
 export function App() {
   const [session, setSession] = useState(null);
   const [memories, setMemories] = useState([]);
+  const [archivedMemories, setArchivedMemories] = useState([]);
   const [reminders, setReminders] = useState([]);
   const [spaces, setSpaces] = useState([]);
-  const [activePage, setActivePage] = useState("home");
+  const [activePage, setActivePage] = useState("landing");
   const [captureOpen, setCaptureOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [newReminderOpen, setNewReminderOpen] = useState(false);
+  const [editingMemory, setEditingMemory] = useState(null);
+  const [editingReminder, setEditingReminder] = useState(null);
   const [askOpen, setAskOpen] = useState(false);
   const [selectedMemory, setSelectedMemory] = useState(null);
   const [toast, setToast] = useState("");
   const [authLoading, setAuthLoading] = useState(true);
   const [showTour, setShowTour] = useState(false);
+  const [mfaChallengeRequired, setMfaChallengeRequired] = useState(false);
 
   const [preferences, setPreferences] = useState(() => {
     try {
@@ -433,26 +428,48 @@ export function App() {
       return true;
     };
 
+    const checkMFA = async () => {
+      try {
+        const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (!error && data?.currentLevel === 'aal1' && data?.nextLevel === 'aal2') {
+          setMfaChallengeRequired(true);
+        } else {
+          setMfaChallengeRequired(false);
+        }
+      } catch (err) {
+        console.error("MFA check failed", err);
+      }
+    };
+
     // Get initial session (page refresh / return visit)
     supabase.auth.getSession().then(async ({ data: { session: s } }) => {
       if (s) {
-        const { data: userData } = await supabase.auth.getUser();
-        setSession(enrichSession(s, userData?.user));
-      } else {
-        setSession(null);
-      }
-      setAuthLoading(false);
-      if (s) {
+        const { data: userData, error } = await supabase.auth.getUser();
+        if (error || !userData?.user) {
+          // If getUser fails (e.g., user was deleted in Supabase), sign out locally
+          await supabase.auth.signOut();
+          setSession(null);
+          setAuthLoading(false);
+          return;
+        }
+        setSession(enrichSession(s, userData.user));
+        checkMFA();
+        setAuthLoading(false);
         loadState();
         routeFirstRunProfile(s);
+      } else {
+        setSession(null);
+        setAuthLoading(false);
       }
     });
+
 
     // Subscribe to future auth changes (sign in, sign out, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, s) => {
         setSession(enrichSession(s));
         if (s) {
+          checkMFA();
           setTimeout(() => {
             refreshConnectedAccounts();
           }, 0);
@@ -487,6 +504,7 @@ export function App() {
     try {
       const data = await apiFetch("/api/state");
       if (data.memories) setMemories(data.memories);
+      if (data.archivedMemories) setArchivedMemories(data.archivedMemories);
       if (data.reminders) setReminders(data.reminders);
       if (data.spaces) setSpaces(data.spaces);
       if (data.profile) {
@@ -530,6 +548,7 @@ export function App() {
         setSearchOpen(false);
         setAskOpen(false);
         setSelectedMemory(null);
+        setEditingMemory(null);
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -584,6 +603,7 @@ export function App() {
   const addMemory = async (draft) => {
     const memoryId = crypto.randomUUID();
     const memory = {
+      ...draft,
       id: memoryId,
       title: draft.title || "Untitled thought",
       excerpt: draft.excerpt,
@@ -595,6 +615,9 @@ export function App() {
       fileName: draft.fileName,
       audioUrl: draft.audioUrl,
       imageUrl: draft.imageUrl,
+      fileUrl: draft.fileUrl,
+      captureSource: draft.captureSource || "web_app",
+      processingStatus: draft.processingStatus || "completed",
       archived: false,
     };
 
@@ -668,6 +691,14 @@ export function App() {
         });
         await updateSpaces(updatedSpaces);
       }
+
+      // Trigger async processing if needed
+      if (draft.processingStatus === "pending") {
+        apiFetch("/api/memories/process", {
+          method: "POST",
+          body: JSON.stringify({ memoryId: memory.id }),
+        }).catch(err => console.error("Async processing error:", err));
+      }
     } catch (err) {
       console.error("addMemory error:", err);
       setToast("Failed to save memory");
@@ -718,6 +749,47 @@ export function App() {
     setToast("Reminder connected to space");
   };
 
+  const removeMemoryFromSpace = async (memoryId, spaceId) => {
+    const updatedSpaces = spaces.map(space => {
+      if (space.id === spaceId) {
+        return { ...space, memoryIds: (space.memoryIds || []).filter(id => id !== memoryId) };
+      }
+      return space;
+    });
+    await updateSpaces(updatedSpaces);
+    setToast("Memory removed from space");
+  };
+
+  const addReminder = async (draft) => {
+    const reminder = {
+      id: crypto.randomUUID(),
+      title: draft.title,
+      due: draft.due || 'Upcoming',
+      time: draft.time || null,
+      source: null,
+      sourceId: null,
+      done: false,
+    };
+
+    if (session?.isDemo) {
+      setReminders(prev => [reminder, ...prev]);
+      setToast('Reminder added');
+      return;
+    }
+
+    try {
+      const data = await apiFetch('/api/reminders', {
+        method: 'POST',
+        body: JSON.stringify({ reminder }),
+      });
+      if (data.reminders) setReminders(data.reminders);
+      setToast('Reminder added');
+    } catch (err) {
+      console.error('addReminder error:', err);
+      setToast('Failed to add reminder');
+    }
+  };
+
   const toggleReminder = async (id) => {
     try {
       const data = await apiFetch("/api/reminders/toggle", {
@@ -732,6 +804,74 @@ export function App() {
     }
   };
 
+  const deleteReminder = async (id) => {
+    try {
+      await apiFetch(`/api/reminders/${id}`, { method: "DELETE" });
+      setReminders(prev => prev.filter(r => r.id !== id));
+      setToast("Reminder deleted");
+    } catch (err) {
+      console.error("deleteReminder error:", err);
+      setToast("Failed to delete reminder");
+    }
+  };
+
+  const deleteRemindersBulk = async (ids) => {
+    try {
+      await apiFetch("/api/reminders/bulk-delete", {
+        method: "POST",
+        body: JSON.stringify({ ids }),
+      });
+      setReminders(prev => prev.filter(r => !ids.includes(r.id)));
+      setToast(`${ids.length} reminders deleted`);
+    } catch (err) {
+      console.error("deleteRemindersBulk error:", err);
+      setToast("Failed to delete reminders");
+    }
+  };
+
+  const deleteMemoriesBulk = async (ids) => {
+    try {
+      await apiFetch("/api/memories/bulk-delete", {
+        method: "POST",
+        body: JSON.stringify({ ids }),
+      });
+      setMemories(prev => prev.filter(m => !ids.includes(m.id)));
+      setToast(`${ids.length} memories deleted`);
+    } catch (err) {
+      console.error("deleteMemoriesBulk error:", err);
+      setToast("Failed to delete memories");
+    }
+  };
+
+  const deleteSpacesBulk = async (ids) => {
+    try {
+      await apiFetch("/api/spaces/bulk-delete", {
+        method: "POST",
+        body: JSON.stringify({ ids }),
+      });
+      setSpaces(prev => prev.filter(s => !ids.includes(s.id)));
+      setToast(`${ids.length} spaces deleted`);
+    } catch (err) {
+      console.error("deleteSpacesBulk error:", err);
+      setToast("Failed to delete spaces");
+    }
+  };
+
+  const editReminder = async (id, updates) => {
+    try {
+      const data = await apiFetch("/api/reminders/edit", {
+        method: "POST",
+        body: JSON.stringify({ id, ...updates }),
+      });
+      setReminders(data.reminders);
+      setEditingReminder(null);
+      setToast("Reminder updated");
+    } catch (err) {
+      console.error("editReminder error:", err);
+      setToast("Failed to update reminder");
+    }
+  };
+
   const archiveMemory = async (id) => {
     try {
       const data = await apiFetch("/api/memories/archive", {
@@ -739,10 +879,72 @@ export function App() {
         body: JSON.stringify({ id }),
       });
       setMemories(data.memories);
+      if (data.archivedMemories) setArchivedMemories(data.archivedMemories);
       setSelectedMemory(null);
       setToast("Memory archived");
     } catch (err) {
       console.error("archiveMemory error:", err);
+    }
+  };
+
+  const emptyArchive = async () => {
+    try {
+      const data = await apiFetch("/api/memories/archive/empty", {
+        method: "DELETE"
+      });
+      if (data.success) {
+        setArchivedMemories([]);
+        setToast("Archive emptied");
+      }
+    } catch (err) {
+      console.error("emptyArchive error:", err);
+    }
+  };
+
+  const deleteArchivedMemories = async (ids) => {
+    try {
+      const data = await apiFetch("/api/memories/archive", {
+        method: "DELETE",
+        body: JSON.stringify({ ids })
+      });
+      if (data.success) {
+        setArchivedMemories(prev => prev.filter(m => !ids.includes(m.id)));
+        setToast(`${ids.length} item${ids.length === 1 ? '' : 's'} permanently deleted`);
+      }
+    } catch (err) {
+      console.error("deleteArchivedMemories error:", err);
+    }
+  };
+
+  const pinMemory = async (id) => {
+    try {
+      const data = await apiFetch("/api/memories/pin", {
+        method: "POST",
+        body: JSON.stringify({ id }),
+      });
+      if (data.memories) setMemories(data.memories);
+      // Update selectedMemory if it was the toggled one
+      setSelectedMemory(prev => prev?.id === id ? { ...prev, isPinned: !prev.isPinned } : prev);
+      setToast("Pinned status updated");
+    } catch (err) {
+      // Optimistic local update on error
+      setMemories(prev => prev.map(m => m.id !== id ? m : { ...m, isPinned: !m.isPinned }));
+      setSelectedMemory(prev => prev?.id === id ? { ...prev, isPinned: !prev.isPinned } : prev);
+    }
+  };
+
+  const topOfMindMemory = async (id) => {
+    try {
+      const data = await apiFetch("/api/memories/top-of-mind", {
+        method: "POST",
+        body: JSON.stringify({ id }),
+      });
+      if (data.memories) setMemories(data.memories);
+      setSelectedMemory(prev => prev?.id === id ? { ...prev, isTopOfMind: !prev.isTopOfMind } : prev);
+      setToast("Top of Mind updated");
+    } catch {
+      setMemories(prev => prev.map(m => m.id !== id ? m : { ...m, isTopOfMind: !m.isTopOfMind }));
+      setSelectedMemory(prev => prev?.id === id ? { ...prev, isTopOfMind: !prev.isTopOfMind } : prev);
     }
   };
 
@@ -800,6 +1002,24 @@ export function App() {
     );
   }
 
+  if (mfaChallengeRequired) {
+    return (
+      <div className="app-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--petrol, #063334)' }}>
+        <MFAVerificationModal 
+          onVerify={() => {
+            setMfaChallengeRequired(false);
+            loadState(); // reload user data after verifying
+          }} 
+          onCancel={async () => {
+            await supabase.auth.signOut();
+            setMfaChallengeRequired(false);
+            setSession(null);
+          }}
+        />
+      </div>
+    );
+  }
+
   if (!session || activePage === "landing") {
     // Don't expose the demo session on the landing page — visitors exploring the demo
     // should see the normal signed-out welcome screen when they return to root.
@@ -807,6 +1027,77 @@ export function App() {
     return <WelcomeScreen session={welcomeSession} onEnter={enterDemo} onNavigateToApp={(page) => setActivePage(page || "home")} />;
   }
 
+
+  const updateMemory = async (id, updates) => {
+    if (session?.isDemo) {
+      setMemories(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
+      setToast("Memory updated");
+      if (selectedMemory?.id === id) {
+        setSelectedMemory(prev => ({ ...prev, ...updates }));
+      }
+      return;
+    }
+    try {
+      const data = await apiFetch(`/api/memories/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ memory: { ...updates, processingStatus: "pending" } })
+      });
+      if (data.memories) {
+        setMemories(prev => prev.map(m => m.id === id ? data.memories[0] : m));
+        if (selectedMemory?.id === id) {
+          setSelectedMemory(data.memories[0]);
+        }
+      }
+      setToast("Memory updated. AI is re-summarizing...");
+
+      // Trigger async processing for re-summarization
+      apiFetch("/api/memories/process?sync=true", {
+        method: "POST",
+        body: JSON.stringify({ memoryId: id }),
+      }).then((result) => {
+        if (result.memory) {
+           setMemories(prev => prev.map(m => m.id === id ? result.memory : m));
+           if (selectedMemory?.id === id) {
+             setSelectedMemory(result.memory);
+           }
+           if (result.memory.processingStatus === 'failed') {
+             setToast("AI processing failed. Please try again.");
+           } else {
+             setToast("AI updated the memory summary");
+           }
+        }
+      }).catch(err => console.error("Async processing error:", err));
+    } catch (err) {
+      console.error(err);
+      setToast("Error updating memory");
+    }
+  };
+
+  const handleMemoryUpsert = (newMem) => {
+    setMemories((prev) => {
+      const idx = prev.findIndex(m => m.id === newMem.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = newMem;
+        return next;
+      }
+      return [newMem, ...prev];
+    });
+  };
+
+  const deleteMemory = async (id) => {
+    try {
+      await apiFetch(`/api/memories/${id}`, { method: "DELETE" });
+      setMemories(prev => prev.filter(m => m.id !== id));
+      if (selectedMemory?.id === id) {
+        setSelectedMemory(null);
+      }
+      setToast("Memory deleted");
+    } catch (err) {
+      console.error("deleteMemory error:", err);
+      setToast("Failed to delete memory");
+    }
+  };
 
   return (
     <>
@@ -819,15 +1110,31 @@ export function App() {
         onUpdateSpaces={updateSpaces}
         onLinkMemoryToSpace={linkMemoryToSpace}
         onLinkReminderToSpace={linkReminderToSpace}
+        onRemoveMemoryFromSpace={removeMemoryFromSpace}
+        onSignOut={handleSignOut}
+        onArchiveMemory={archiveMemory}
+        onPinMemory={pinMemory}
+        onTopOfMindMemory={topOfMindMemory}
+        onMemoryUpsert={handleMemoryUpsert}
+        onDeleteMemory={deleteMemory}
+        onEditReminder={(r) => setEditingReminder(r)}
+        archivedMemories={archivedMemories}
+        onEmptyArchive={emptyArchive}
+        onDeleteArchivedMemories={deleteArchivedMemories}
         onNavigate={setActivePage}
         onSaveProfile={handleSaveProfile}
         onCapture={() => setCaptureOpen(true)}
+        onEditMemory={setEditingMemory}
         onSaveMemory={addMemory}
         onSearch={() => setSearchOpen(true)}
         onAsk={() => setAskOpen(true)}
         onSelectMemory={setSelectedMemory}
         onToggleReminder={toggleReminder}
-        onSignOut={handleSignOut}
+        onDeleteReminder={deleteReminder}
+        onDeleteRemindersBulk={deleteRemindersBulk}
+        onDeleteMemoriesBulk={deleteMemoriesBulk}
+        onDeleteSpacesBulk={deleteSpacesBulk}
+        onAddReminder={() => setNewReminderOpen(true)}
         preferences={preferences}
         updatePreferences={updatePreferences}
         setToast={setToast}
@@ -841,8 +1148,23 @@ export function App() {
             onClose={() => setSearchOpen(false)}
             onCapture={() => { setSearchOpen(false); setCaptureOpen(true); }}
             onSelect={(memory) => { setSearchOpen(false); setSelectedMemory(memory); }}
+            onEdit={setEditingMemory}
           />
         ) : null}
+        {editingMemory ? (
+          <EditMemoryModal 
+            memory={editingMemory} 
+            onClose={() => setEditingMemory(null)} 
+            onSave={updateMemory} 
+          />
+        ) : null}
+        {editingReminder && (
+          <EditReminderModal
+            reminder={editingReminder}
+            onClose={() => setEditingReminder(null)}
+            onSave={editReminder}
+          />
+        )}
         {selectedMemory ? (
           <MemoryDrawer
             memory={selectedMemory}
@@ -852,6 +1174,10 @@ export function App() {
             onNavigate={setSelectedMemory}
             onArchive={archiveMemory}
             onClose={() => setSelectedMemory(null)}
+            onPin={pinMemory}
+            onTopOfMind={topOfMindMemory}
+            onEdit={setEditingMemory}
+            onDelete={deleteMemory}
           />
         ) : null}
         {askOpen ? (
@@ -859,6 +1185,12 @@ export function App() {
             memories={visibleMemories}
             onSelectMemory={setSelectedMemory}
             onClose={() => setAskOpen(false)}
+          />
+        ) : null}
+        {newReminderOpen ? (
+          <NewReminderModal
+            onClose={() => setNewReminderOpen(false)}
+            onSave={(draft) => { addReminder(draft); setNewReminderOpen(false); }}
           />
         ) : null}
         {showTour ? (

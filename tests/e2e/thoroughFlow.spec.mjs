@@ -152,13 +152,13 @@ test.describe("Recall E2E thorough flow (mocked /api)", () => {
     await expect(refButtons.first()).toBeVisible({ timeout: 10_000 });
 
     // Close AskPanel
-    await page.locator(".ask-panel .icon-button").first().click();
+    await page.getByRole("button", { name: "Close Ask Recall" }).click();
 
     // CommandPalette: open via keyboard shortcut Ctrl+K / Cmd+K
-    await page.keyboard.press("Meta+K");
-    await expect(page.getByPlaceholder("Search by idea, source, or feeling…")).toBeVisible();
+    await page.keyboard.press("Control+K");
+    await expect(page.getByPlaceholder(/Search by idea, source/)).toBeVisible();
 
-    await page.getByPlaceholder("Search by idea, source, or feeling…").fill("privacy");
+    await page.getByPlaceholder(/Search by idea, source/).fill("privacy");
     const memCard = page.locator(".command-memory-cards button").first();
     await expect(memCard).toBeVisible();
     await memCard.click();
@@ -168,11 +168,9 @@ test.describe("Recall E2E thorough flow (mocked /api)", () => {
 
     // Reminders: navigate to Reminders page
     // Ensure any drawer/scrim overlay is closed; otherwise pointer events get intercepted.
-    await page.locator(".ask-panel .icon-button, [role='dialog'] .icon-button").first().click({ timeout: 2000 }).catch(() => {});
-    await page.locator(".memory-drawer .icon-button, [role='dialog'] .icon-button").first().click({ timeout: 2000 }).catch(() => {});
-    await expect(page.locator(".drawer-scrim")).toHaveCount(0, { timeout: 10_000 }).catch(async () => {
-      await expect(page.locator(".drawer-scrim")).toBeHidden({ timeout: 10_000 }).catch(() => {});
-    });
+    await page.getByRole("button", { name: "Close Ask Recall" }).click({ timeout: 2000 }).catch(() => {});
+    await page.getByRole("button", { name: "Close memory" }).click({ timeout: 2000 }).catch(() => {});
+    await page.locator(".drawer-scrim").waitFor({ state: "detached", timeout: 10000 }).catch(() => {});
 
     // Sidebar has icon+label buttons; use navigation button text.
     await page.getByRole("button", { name: /Reminders/i }).first().click();
@@ -200,7 +198,7 @@ test.describe("Recall E2E thorough flow (mocked /api)", () => {
     await expect(navReminders).toBeVisible();
 
     // Close any open scrims/dialogs before interacting with mobile nav
-    await page.locator(".drawer-scrim").waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+    await page.locator(".drawer-scrim").waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
     await page.locator(".profile-scrim").waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
 
     // Home: assert on a stable Home-page element rather than demo-specific resurfacing content.

@@ -71,6 +71,14 @@ export function WelcomeScreen({ session, onEnter, onNavigateToApp }) {
       ? session.user.email.slice(0, 2).toUpperCase() 
       : "DU";
 
+  const handleCreateYoursClick = () => {
+    if (session) {
+      onNavigateToApp("home");
+    } else {
+      setAuthMode("create");
+    }
+  };
+
   // Close dropdown on click outside using element.closest() traversing
   useEffect(() => {
     if (!welcomeDropdownOpen) return;
@@ -111,10 +119,6 @@ export function WelcomeScreen({ session, onEnter, onNavigateToApp }) {
               src={heroNotebookAnimation}
               poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
               style={{
-                backgroundImage: `url(${heroNotebook})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-                backgroundRepeat: "no-repeat",
                 display: "block",
                 width: "100%",
                 height: "100%",
@@ -133,7 +137,6 @@ export function WelcomeScreen({ session, onEnter, onNavigateToApp }) {
               <a href="#about">About</a>
               <a href="#features">Features</a>
               <a href="#privacy">Privacy</a>
-              <a href="#pricing">Pricing</a>
               <a href="#faq">FAQ</a>
             </div>
             <div className="welcome-account-actions">
@@ -255,7 +258,9 @@ export function WelcomeScreen({ session, onEnter, onNavigateToApp }) {
                 <motion.p variants={{ hidden: { opacity: 0, y: 60, scale: 0.92, rotateX: 10 }, visible: { opacity: 1, y: 0, scale: 1, rotateX: 0, transition: popularSpring } }}>Notes, links, images, recordings, and useful fragments can live together without becoming another system to maintain.</motion.p>
                 <motion.div className="hero-actions" variants={{ hidden: { opacity: 0, y: 60, scale: 0.92, rotateX: 10 }, visible: { opacity: 1, y: 0, scale: 1, rotateX: 0, transition: popularSpring } }}>
                   <motion.button whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.95 }} className="primary-button" type="button" onClick={() => onEnter("demo")}>Explore the demo <ArrowRight weight="bold" /></motion.button>
-                  <motion.button whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.95 }} className="secondary-button" type="button" onClick={() => setAuthMode("create")}>Create yours</motion.button>
+                  <motion.button whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.95 }} className="secondary-button" type="button" onClick={handleCreateYoursClick}>
+                    {session ? "Enter workspace" : "Create yours"}
+                  </motion.button>
                 </motion.div>
               
             </div>
@@ -395,17 +400,6 @@ export function WelcomeScreen({ session, onEnter, onNavigateToApp }) {
           </motion.button>
         </motion.section>
 
-        <motion.section className="pricing-section pricing-section--reference" id="pricing" initial="hidden" whileInView="visible" viewport={vp} variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.1 } } }}>
-          <header className="reference-section-heading">
-            <motion.div variants={{ hidden: { opacity: 0, y: 60, scale: 0.92, rotateX: 10 }, visible: { opacity: 1, y: 0, scale: 1, rotateX: 0, transition: popularSpring } }}><span>Simple pricing</span><h2>Start with one<br />private space.</h2></motion.div>
-            <motion.p variants={{ hidden: { opacity: 0, y: 60, scale: 0.92, rotateX: 10 }, visible: { opacity: 1, y: 0, scale: 1, rotateX: 0, transition: popularSpring } }}>Choose how deeply you want Recall to understand and connect what you keep.</motion.p>
-          </header>
-          <div className="pricing-table">
-            <motion.article variants={{ hidden: { opacity: 0, y: 60, scale: 0.92, rotateX: 10 }, visible: { opacity: 1, y: 0, scale: 1, rotateX: 0, transition: popularSpring } }} whileHover={{ scale: 1.04, y: -10 }} whileTap={{ scale: 0.96 }}><div><span>Free</span><h3>$0</h3><p>For starting the habit.</p></div><ul><li><Check /> Personal notes and links</li><li><Check /> Local browser storage</li><li><Check /> Search and reminders</li></ul><motion.button whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.95 }} className="secondary-button" onClick={() => onEnter("empty")}>Create free space</motion.button></motion.article>
-            <motion.article className="is-featured" variants={{ hidden: { opacity: 0, y: 60, scale: 0.92, rotateX: 10 }, visible: { opacity: 1, y: 0, scale: 1, rotateX: 0, transition: popularSpring } }} whileHover={{ scale: 1.06, y: -15, boxShadow: "0px 24px 48px rgba(0,0,0,0.2)" }} whileTap={{ scale: 0.96 }}><div><span>Signal Plus</span><h3>$8<small>/month</small></h3><p>For a memory that connects itself.</p></div><ul><li><Check /> Every capture format</li><li><Check /> Summaries and relationships</li><li><Check /> Ask your complete space</li><li><Check /> Smart resurfacing</li></ul><motion.button whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.95 }} className="primary-button" onClick={() => setAuthMode("create")}>Start with Plus</motion.button></motion.article>
-            <motion.article variants={{ hidden: { opacity: 0, y: 60, scale: 0.92, rotateX: 10 }, visible: { opacity: 1, y: 0, scale: 1, rotateX: 0, transition: popularSpring } }} whileHover={{ scale: 1.04, y: -10 }} whileTap={{ scale: 0.96 }}><div><span>Signal Pro</span><h3>$16<small>/month</small></h3><p>For larger, deeper libraries.</p></div><ul><li><Check /> Everything in Plus</li><li><Check /> Advanced exports</li><li><Check /> Model and privacy controls</li><li><Check /> Priority processing</li></ul><motion.button whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.95 }} className="secondary-button" onClick={() => setAuthMode("create")}>Choose Pro</motion.button></motion.article>
-          </div>
-        </motion.section>
 
         <motion.section className="faq-section faq-section--reference" id="faq" initial="hidden" whileInView="visible" viewport={vp} variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.1 } } }}>
           <motion.div className="section-heading" variants={{ hidden: { opacity: 0, y: 60, scale: 0.92, rotateX: 10 }, visible: { opacity: 1, y: 0, scale: 1, rotateX: 0, transition: popularSpring } }}><span>Questions, answered</span><h2>Before you trust it with a memory.</h2></motion.div>
@@ -416,11 +410,11 @@ export function WelcomeScreen({ session, onEnter, onNavigateToApp }) {
           <motion.div variants={{ hidden: { opacity: 0, y: 60, scale: 0.92, rotateX: 10 }, visible: { opacity: 1, y: 0, scale: 1, rotateX: 0, transition: popularSpring } }}><img src={logoLightTransparent} alt="Recall Logo" className="final-cta-logo" /></motion.div>
           <motion.h2 variants={{ hidden: { opacity: 0, y: 60, scale: 0.92, rotateX: 10 }, visible: { opacity: 1, y: 0, scale: 1, rotateX: 0, transition: popularSpring } }}>Make room for everything you do not want to lose.</motion.h2>
           <motion.p variants={{ hidden: { opacity: 0, y: 60, scale: 0.92, rotateX: 10 }, visible: { opacity: 1, y: 0, scale: 1, rotateX: 0, transition: popularSpring } }}>Start a private second space for the notes, images, links, and conversations worth keeping close.</motion.p>
-          <motion.div variants={{ hidden: { opacity: 0, y: 60, scale: 0.92, rotateX: 10 }, visible: { opacity: 1, y: 0, scale: 1, rotateX: 0, transition: popularSpring } }}><motion.button whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.95 }} className="primary-button primary-button--large" type="button" onClick={() => setAuthMode("create")}>Create your space <ArrowRight /></motion.button><motion.button whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.95 }} className="footer-text-button" type="button" onClick={() => onEnter("demo")}>Explore the demo</motion.button></motion.div>
+          <motion.div variants={{ hidden: { opacity: 0, y: 60, scale: 0.92, rotateX: 10 }, visible: { opacity: 1, y: 0, scale: 1, rotateX: 0, transition: popularSpring } }}><motion.button whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.95 }} className="primary-button primary-button--large" type="button" onClick={handleCreateYoursClick}>{session ? "Enter workspace" : "Create your space"} <ArrowRight /></motion.button><motion.button whileHover={{ scale: 1.05, y: -2 }} whileTap={{ scale: 0.95 }} className="footer-text-button" type="button" onClick={() => onEnter("demo")}>Explore the demo</motion.button></motion.div>
         </motion.section>
       </div>
 
-      <footer className="app-footer welcome-footer"><div><a className="brand brand--footer" href="#top"><img src={logoLightTransparent} alt="Recall Logo" className="brand-logo" /> Recall</a><p>Your private space for everything worth remembering.</p></div><div><strong>Product</strong><a href="#features">Features</a><a href="#workflows">Workflows</a><a href="#pricing">Pricing</a></div><div><strong>Company</strong><a href="#about">About</a><a href="#faq">FAQ</a><button onClick={() => setAuthMode("signin")}>Sign in</button></div><div><strong>Principles</strong><span>Local-first</span><span>Source-grounded</span><span>Exportable</span></div><p className="footer-note">© 2026 Recall. MVP demo.</p></footer>
+      <footer className="app-footer welcome-footer"><div><a className="brand brand--footer" href="#top"><img src={logoLightTransparent} alt="Recall Logo" className="brand-logo" /> Recall</a><p>Your private space for everything worth remembering.</p></div><div><strong>Product</strong><a href="#features">Features</a><a href="#workflows">Workflows</a></div><div><strong>Company</strong><a href="#about">About</a><a href="#faq">FAQ</a>{session ? <button onClick={() => onNavigateToApp("home")}>Enter workspace</button> : <button onClick={() => setAuthMode("signin")}>Sign in</button>}</div><div><strong>Principles</strong><span>Local-first</span><span>Source-grounded</span><span>Exportable</span></div><p className="footer-note">© 2026 Recall. MVP demo.</p></footer>
 
       {authMode ? <AuthModal mode={authMode} onClose={() => setAuthMode(null)} onEnter={onEnter} /> : null}
     </main>

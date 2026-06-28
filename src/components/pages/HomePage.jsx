@@ -1,8 +1,8 @@
-import { ArrowRight, FileText, Image, Link, Sparkle, Waveform } from "@phosphor-icons/react";
+import { ArrowRight, FileText, Image, Link, Sparkle, Waveform, Star } from "@phosphor-icons/react";
 import { MemoryTimeline } from "../MemoryTimeline.jsx";
+import { MemoryCard } from "../MemoryCard.jsx";
 import boardImage from "../../assets/privacy-positioning-board.png";
-
-export function HomePage({ memories, onCapture, onSelectMemory, reminders = [], preferences }) {
+export function HomePage({ memories, onCapture, onSelectMemory, onEditMemory, reminders = [], preferences }) {
   if (!memories.length) {
     return (
       <div className="home-page">
@@ -139,6 +139,21 @@ export function HomePage({ memories, onCapture, onSelectMemory, reminders = [], 
             </article>
           )}
         </>
+      )}
+
+      {memories.some(m => m.isTopOfMind) && (
+        <section className="top-of-mind-strip" aria-label="Top of Mind memories">
+          <header style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "12px", color: "#ca8a04", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600 }}>
+            <Star weight="fill" /> Top of mind
+          </header>
+          <div className="top-of-mind-cards" style={{ display: "flex", gap: "12px", overflowX: "auto", paddingBottom: "12px" }}>
+            {memories.filter(m => m.isTopOfMind).map(m => (
+              <div key={m.id} style={{ flex: "0 0 300px" }}>
+                <MemoryCard memory={m} onSelect={onSelectMemory} onEdit={onEditMemory} variant="compact" />
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
       <MemoryTimeline memories={memories} onSelectMemory={onSelectMemory} />

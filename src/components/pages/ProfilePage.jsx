@@ -20,7 +20,7 @@ export function ProfilePage({ session, onSaveProfile, toast, preferences, onLink
   const isGithub = !!session?.githubConnected;
 
   return (
-    <div className="subpage profile-page" style={{ maxWidth: "100%", margin: "0" }}>
+    <div className="subpage profile-page">
       <div className="subpage-heading">
         <div>
           <span className="page-kicker">Personal settings</span>
@@ -29,7 +29,7 @@ export function ProfilePage({ session, onSaveProfile, toast, preferences, onLink
         </div>
       </div>
 
-      <form className="profile-form" onSubmit={handleSubmit} style={{ display: "grid", gap: "28px", marginTop: "32px" }}>
+      <form className="profile-form" onSubmit={handleSubmit} style={{ display: "grid", gap: "28px", marginTop: "32px", width: "100%", minWidth: 0 }}>
         
         {/* Profile Card Info */}
         <section className="settings-section" style={{ background: "rgba(255,255,255,0.25)", border: "1px solid var(--line)", borderRadius: "16px", padding: "24px", backdropFilter: "blur(10px)" }}>
