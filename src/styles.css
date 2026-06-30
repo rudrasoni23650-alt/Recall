@@ -1820,6 +1820,22 @@ input:checked + .check-ring::after { content: ""; position: absolute; inset: 4px
 /* Welcome page: editorial product story */
 .welcome-shell {
   --welcome-gutter: clamp(8px, 1.875vw, 24px);
+  --petrol: #0d4b4d;
+  --petrol-deep: #083c3e;
+  --petrol-light: #2d6a6c;
+  --canvas: #f1f2eb;
+  --canvas-deep: #e8ece3;
+  --surface: #f7f7f1;
+  --eucalyptus: #aec5b9;
+  --sea-glass: #9ec6c1;
+  --coral: #dc806d;
+  --coral-deep: #c96e5b;
+  --amber-soft: #e9c779;
+  --ink: #153f40;
+  --muted: #627675;
+  --line: rgba(21, 63, 64, 0.16);
+  --rail-text: #eef5ed;
+  --rail: var(--rail-text);
   min-height: 100vh;
   overflow-x: hidden;
   background: var(--canvas);
