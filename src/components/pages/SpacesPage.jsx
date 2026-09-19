@@ -5,7 +5,7 @@ import { ArrowLeft, ArrowRight, CirclesThreePlus, FolderOpen, FolderPlus, Plus, 
 import { MemoryCard } from "../MemoryCard.jsx";
 
 
-export function SpacesPage({ memories, reminders, spaces = [], onUpdateSpaces, onSaveMemory, onSelectMemory, onEditMemory, onEditReminder, onDeleteSpacesBulk }) {
+export function SpacesPage({ memories, reminders, spaces = [], onUpdateSpaces, onSaveMemory, onSelectMemory, onEditMemory, onEditReminder, onDeleteSpacesBulk, onRemoveMemoryFromSpace }) {
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [selectedSpaceId, setSelectedSpaceId] = useState(null);
@@ -47,6 +47,7 @@ export function SpacesPage({ memories, reminders, spaces = [], onUpdateSpaces, o
         onSelectMemory={onSelectMemory}
         onEditMemory={onEditMemory}
         onEditReminder={onEditReminder}
+        onRemoveMemoryFromSpace={onRemoveMemoryFromSpace}
       />
     );
   }
@@ -209,7 +210,7 @@ export function SpacesPage({ memories, reminders, spaces = [], onUpdateSpaces, o
   );
 }
 
-function SpaceDetailPage({ space, memories, reminders, spaces, onBack, onUpdateSpaces, onSaveMemory, onSelectMemory, onEditMemory, onEditReminder }) {
+function SpaceDetailPage({ space, memories, reminders, spaces, onBack, onUpdateSpaces, onSaveMemory, onSelectMemory, onEditMemory, onEditReminder, onRemoveMemoryFromSpace }) {
   const [activeTab, setActiveTab] = useState("memories");
   const [showAddMemory, setShowAddMemory] = useState(false);
   const [showAddReminderForm, setShowAddReminderForm] = useState(false);
@@ -232,6 +233,23 @@ function SpaceDetailPage({ space, memories, reminders, spaces, onBack, onUpdateS
     setShowAddMemory(false);
   };
 
+  const removeMemoryFromSpace = (memoryId) => {
+    if (onRemoveMemoryFromSpace) {
+      onRemoveMemoryFromSpace(memoryId, space.id);
+    } else {
+      const updatedSpaces = spaces.map((s) => {
+        if (s.id === space.id) {
+          return {
+            ...s,
+            memoryIds: (s.memoryIds || []).filter((id) => id !== memoryId),
+          };
+        }
+        return s;
+      });
+      onUpdateSpaces(updatedSpaces);
+    }
+  };
+
   const addReminderToSpace = (reminderId) => {
     const updatedSpaces = spaces.map((s) => {
       if (s.id === space.id) {
@@ -245,16 +263,31 @@ function SpaceDetailPage({ space, memories, reminders, spaces, onBack, onUpdateS
     setShowAddReminderForm(false);
   };
 
+  const removeReminderFromSpace = (reminderId) => {
+    const updatedSpaces = spaces.map((s) => {
+      if (s.id === space.id) {
+        return {
+          ...s,
+          reminderIds: (s.reminderIds || []).filter((id) => id !== reminderId),
+        };
+      }
+      return s;
+    });
+    onUpdateSpaces(updatedSpaces);
+  };
+
   return (
     <div className="subpage space-detail-page">
       <div className="subpage-heading" style={{ borderBottom: 'none', paddingBottom: 0 }}>
         <div>
           <button
-            className="quiet-button"
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', background: 'none', border: 'none', color: 'var(--coral)', marginBottom: '12px', padding: 0 }}
+            className="space-back-button"
+            type="button"
             onClick={onBack}
+            aria-label="Back to spaces"
           >
-            <ArrowLeft weight="bold" /> Back to spaces
+            <ArrowLeft size={16} weight="bold" />
+            <span>Back to spaces</span>
           </button>
           <span className="page-kicker">{space.eyebrow}</span>
           <h1 style={{ marginBottom: '8px' }}>{space.title}</h1>
@@ -335,7 +368,14 @@ function SpaceDetailPage({ space, memories, reminders, spaces, onBack, onUpdateS
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
                 {spaceMemories.map((memory) => (
-                  <MemoryCard key={memory.id} memory={memory} variant="library" onSelect={onSelectMemory} onEdit={onEditMemory} />
+                  <MemoryCard
+                    key={memory.id}
+                    memory={memory}
+                    variant="library"
+                    onSelect={onSelectMemory}
+                    onEdit={onEditMemory}
+                    onRemoveFromSpace={() => removeMemoryFromSpace(memory.id)}
+                  />
                 ))}
               </div>
             </>
@@ -402,7 +442,7 @@ function SpaceDetailPage({ space, memories, reminders, spaces, onBack, onUpdateS
                       <strong style={{ display: 'block', fontSize: '15px', color: 'var(--ink)', fontWeight: 500 }}>{item.title}</strong>
                       <span style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '4px', display: 'block' }}>{item.due} · {item.time || "All Day"}</span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <button
                         className="reminder-action-btn"
                         type="button"
@@ -410,6 +450,15 @@ function SpaceDetailPage({ space, memories, reminders, spaces, onBack, onUpdateS
                         style={{ border: '1px solid var(--line)', background: 'var(--canvas)', color: 'var(--ink)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}
                       >
                         Edit
+                      </button>
+                      <button
+                        className="reminder-action-btn"
+                        type="button"
+                        onClick={() => removeReminderFromSpace(item.id)}
+                        style={{ border: '1px solid var(--line)', background: 'var(--canvas)', color: 'var(--coral)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}
+                        title="Remove from this space"
+                      >
+                        Remove
                       </button>
                       {item.done ? (
                         <span style={{ fontSize: '12px', color: 'var(--petrol-light)', background: 'rgba(21, 63, 64, 0.08)', padding: '4px 10px', borderRadius: '99px', fontWeight: 500 }}>Completed</span>

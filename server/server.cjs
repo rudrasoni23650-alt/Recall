@@ -37,12 +37,13 @@ const fs = require('fs');
 const path = require('path');
 const DB_PATH = path.join(__dirname, 'db.json');
 
+const nowMs = Date.now();
 const baselineMemories = [
-  { id: "launch-core", title: "Launch brief — core messaging", excerpt: "Refined messaging pillars and audience narrative for launch.", type: "note", dateGroup: "Today", time: "9:41 AM", tag: "Launch", sourceIds: ["customer-interview", "privacy-reference"], archived: false },
-  { id: "market-landscape", title: "Privacy-first AI — market landscape", excerpt: "Competitive scan and messaging angles.", type: "link", dateGroup: "Yesterday", time: "4:22 PM", tag: "Research", sourceIds: ["privacy-reference", "launch-core"], archived: false },
-  { id: "launch-moodboard", title: "Launch moodboard", excerpt: "Visual direction and tone for the campaign.", type: "image", dateGroup: "Yesterday", time: "11:07 AM", tag: "Brand", sourceIds: ["launch-core", "market-landscape"], archived: false },
-  { id: "customer-interview", title: "Customer interview — Maya Chen", excerpt: "Key themes: trust, transparency, and control.", type: "voice", dateGroup: "May 12", time: "7:36 PM", duration: "2:31", tag: "Interview", sourceIds: ["launch-core"], archived: false },
-  { id: "privacy-reference", title: "Saved reference — privacy patterns", excerpt: "Strong examples of clear, human messaging.", type: "note", dateGroup: "May 12", time: "10:15 AM", tag: "Reference", sourceIds: ["market-landscape", "launch-core"], archived: false }
+  { id: "launch-core", title: "Launch brief — core messaging", excerpt: "Refined messaging pillars and audience narrative for launch.", type: "note", dateGroup: "Today", time: "9:41 AM", created_at: new Date(nowMs - 2 * 60 * 60 * 1000).toISOString(), createdAt: new Date(nowMs - 2 * 60 * 60 * 1000).toISOString(), tag: "Launch", sourceIds: ["customer-interview", "privacy-reference"], archived: false },
+  { id: "market-landscape", title: "Privacy-first AI — market landscape", excerpt: "Competitive scan and messaging angles.", type: "link", dateGroup: "Yesterday", time: "4:22 PM", created_at: new Date(nowMs - 26 * 60 * 60 * 1000).toISOString(), createdAt: new Date(nowMs - 26 * 60 * 60 * 1000).toISOString(), tag: "Research", sourceIds: ["privacy-reference", "launch-core"], archived: false },
+  { id: "launch-moodboard", title: "Launch moodboard", excerpt: "Visual direction and tone for the campaign.", type: "image", dateGroup: "Yesterday", time: "11:07 AM", created_at: new Date(nowMs - 28 * 60 * 60 * 1000).toISOString(), createdAt: new Date(nowMs - 28 * 60 * 60 * 1000).toISOString(), tag: "Brand", sourceIds: ["launch-core", "market-landscape"], archived: false },
+  { id: "customer-interview", title: "Customer interview — Maya Chen", excerpt: "Key themes: trust, transparency, and control.", type: "voice", dateGroup: "May 12", time: "7:36 PM", duration: "2:31", created_at: new Date("2024-05-12T19:36:00.000Z").toISOString(), createdAt: new Date("2024-05-12T19:36:00.000Z").toISOString(), tag: "Interview", sourceIds: ["launch-core"], archived: false },
+  { id: "privacy-reference", title: "Saved reference — privacy patterns", excerpt: "Strong examples of clear, human messaging.", type: "note", dateGroup: "May 12", time: "10:15 AM", created_at: new Date("2024-05-12T10:15:00.000Z").toISOString(), createdAt: new Date("2024-05-12T10:15:00.000Z").toISOString(), tag: "Reference", sourceIds: ["market-landscape", "launch-core"], archived: false }
 ];
 
 const baselineReminders = [
@@ -1036,6 +1037,44 @@ app.post('/api/memories', async (req, res) => {
   let enrichedMemory = { ...memory };
   let enrichedReminder = reminder;
 
+  const now = new Date();
+  const createdAt = enrichedMemory.createdAt || enrichedMemory.created_at || now.toISOString();
+
+  let memTime = enrichedMemory.time;
+  if (!memTime) {
+    const d = new Date(createdAt);
+    const validD = !isNaN(d.getTime()) ? d : now;
+    let h = validD.getHours();
+    const m = String(validD.getMinutes()).padStart(2, '0');
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12;
+    if (h === 0) h = 12;
+    memTime = `${h}:${m} ${ampm}`;
+  }
+
+  let memDateGroup = enrichedMemory.dateGroup || enrichedMemory.date_group;
+  if (!memDateGroup) {
+    const d = new Date(createdAt);
+    if (!isNaN(d.getTime())) {
+      const today = new Date();
+      const isToday = d.toDateString() === today.toDateString();
+      const yesterday = new Date(today);
+      yesterday.setDate(today.getDate() - 1);
+      const isYesterday = d.toDateString() === yesterday.toDateString();
+      if (isToday) memDateGroup = 'Today';
+      else if (isYesterday) memDateGroup = 'Yesterday';
+      else memDateGroup = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    } else {
+      memDateGroup = 'Today';
+    }
+  }
+
+  enrichedMemory.createdAt = createdAt;
+  enrichedMemory.created_at = createdAt;
+  enrichedMemory.time = memTime;
+  enrichedMemory.dateGroup = memDateGroup;
+  enrichedMemory.date_group = memDateGroup;
+
   // AI enrichment
   if (autoSummarize !== false && genAI && (memory.type === 'note' || memory.type === 'link')) {
     const content = memory.type === 'link' ? memory.url : memory.excerpt;
@@ -1080,8 +1119,9 @@ app.post('/api/memories', async (req, res) => {
         title:         enrichedMemory.title,
         excerpt:       enrichedMemory.excerpt,
         type:          enrichedMemory.type,
-        date_group:    enrichedMemory.dateGroup || 'Today',
-        time:          enrichedMemory.time,
+        date_group:    memDateGroup,
+        time:          memTime,
+        created_at:    createdAt,
         tag:           enrichedMemory.tag,
         url:           enrichedMemory.url,
         file_name:     enrichedMemory.fileName,
@@ -1178,6 +1218,11 @@ app.put('/api/memories/:id', async (req, res) => {
     if (memory.body !== undefined) updatePayload.body = memory.body;
     if (memory.plainText !== undefined) updatePayload.plain_text = memory.plainText;
     if (memory.type !== undefined) updatePayload.type = memory.type;
+    if (memory.dateGroup !== undefined) updatePayload.date_group = memory.dateGroup;
+    if (memory.date_group !== undefined) updatePayload.date_group = memory.date_group;
+    if (memory.time !== undefined) updatePayload.time = memory.time;
+    if (memory.createdAt !== undefined) updatePayload.created_at = memory.createdAt;
+    if (memory.created_at !== undefined) updatePayload.created_at = memory.created_at;
     if (memory.processingStatus !== undefined) updatePayload.processing_status = memory.processingStatus;
 
     const { data: updatedMem, error: memErr } = await supabaseAdmin
@@ -1662,16 +1707,57 @@ app.post('/api/signout', async (req, res) => {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+function formatServerMemoryDateTime(createdAt, fallbackDateGroup, fallbackTime) {
+  let dateGroup = fallbackDateGroup;
+  let time = fallbackTime;
+
+  if (createdAt) {
+    const d = new Date(createdAt);
+    if (!isNaN(d.getTime())) {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      const diffMs = today.getTime() - target.getTime();
+      const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+      if (diffDays === 0) {
+        dateGroup = "Today";
+      } else if (diffDays === 1) {
+        dateGroup = "Yesterday";
+      } else {
+        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        dateGroup = `${months[d.getMonth()]} ${d.getDate()}`;
+      }
+
+      if (!time) {
+        let h = d.getHours();
+        const m = String(d.getMinutes()).padStart(2, "0");
+        const ampm = h >= 12 ? "PM" : "AM";
+        h = h % 12;
+        if (h === 0) h = 12;
+        time = `${h}:${m} ${ampm}`;
+      }
+    }
+  }
+
+  return {
+    dateGroup: dateGroup || fallbackDateGroup || "Today",
+    time: time || fallbackTime || ""
+  };
+}
+
 /** Normalize a Supabase snake_case row to the camelCase shape the frontend expects */
 function normalizeMemory(row) {
+  const { dateGroup, time } = formatServerMemoryDateTime(row.created_at, row.date_group, row.time);
+
   return {
     // ── Legacy fields (always present) ──────────────────────────
     id:           row.id,
     title:        row.title,
     excerpt:      row.excerpt,
     type:         row.type,
-    dateGroup:    row.date_group || 'Today',
-    time:         row.time,
+    dateGroup:    dateGroup,
+    time:         time,
     tag:          row.tag,
     url:          row.url,
     fileName:     row.file_name,
@@ -1681,6 +1767,7 @@ function normalizeMemory(row) {
     sourceIds:    row.source_ids || [],
     duration:     row.duration,
     createdAt:    row.created_at,
+    created_at:   row.created_at,
 
     // ── New rich-content fields ──────────────────────────────────
     body:               row.body          || null,

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { X } from "@phosphor-icons/react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion } from "motion/react";
 import { toYYYYMMDD, toHHMM, formatDue, formatTime } from "../lib/dateUtils.js";
 import { DatePicker, TimePicker } from "./CustomPickers.jsx";
 
@@ -21,8 +21,7 @@ export function EditReminderModal({ reminder, onClose, onSave }) {
   };
 
   return (
-    <AnimatePresence>
-      <motion.div
+    <motion.div
         className="overlay"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -103,6 +102,5 @@ export function EditReminderModal({ reminder, onClose, onSave }) {
           </footer>
         </motion.section>
       </motion.div>
-    </AnimatePresence>
   );
 }

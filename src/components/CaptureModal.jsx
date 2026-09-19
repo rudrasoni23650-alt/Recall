@@ -6,7 +6,7 @@ import {
   CheckSquare, Highlighter, Article,
 } from "@phosphor-icons/react";
 import { supabase } from "../lib/supabase.js";
-import { toYYYYMMDD, toHHMM, formatDue, formatTime } from "../lib/dateUtils.js";
+import { toYYYYMMDD, toHHMM, formatDue, formatTime, formatMemoryTime, formatMemoryDateGroup } from "../lib/dateUtils.js";
 import { DatePicker, TimePicker } from "./CustomPickers.jsx";
 
 const TYPES = [
@@ -448,6 +448,10 @@ export function CaptureModal({ onClose, onSave }) {
 
     // Determine capture source label
     const captureSource = "web_app";
+    const now = new Date();
+    const createdAt = now.toISOString();
+    const memoryDateGroup = "Today";
+    const memoryTime = formatMemoryTime(now);
 
     window.setTimeout(() => onSave({
       type:          isReminder ? "note" : type,
@@ -460,6 +464,9 @@ export function CaptureModal({ onClose, onSave }) {
       imageUrl:      finalImageUrl,
       fileUrl:       finalFileUrl,
       captureSource,
+      createdAt,
+      dateGroup:     memoryDateGroup,
+      time:          memoryTime,
       processingStatus: (isLinkType || isFileType) ? "pending" : "completed",
       reminder: isReminder
         ? { title: cleanText, due: formatDue(due), time: formatTime(time) }

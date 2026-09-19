@@ -566,7 +566,7 @@ export function AccountPage({
               style={{ height: "42px", padding: "0 12px", border: "1px solid var(--line)", borderRadius: "8px", background: "var(--surface)", fontSize: "14px", color: "var(--ink)", outline: "none" }}
             >
               <option value="petrol">Deep Petrol (Default)</option>
-              <option value="apple-glass">Apple Frosted Glass</option>
+              <option value="apple-glass">Frosted Glass</option>
               <option value="dark">Midnight Obsidian (Dark)</option>
               <option value="monochrome">Minimalist Studio</option>
             </select>

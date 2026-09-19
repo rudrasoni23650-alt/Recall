@@ -14,11 +14,13 @@ import { DemoTourModal } from "./components/DemoTourModal.jsx";
 import demoMoodboardImg from "./assets/privacy-positioning-board.png";
 import demoNotebookImg from "./assets/asset-notebook.png";
 import demoVoiceAudio from "./assets/demo-voice-interview.wav";
+import { formatMemoryDateGroup, formatMemoryTime } from "./lib/dateUtils.js";
 
 const FIRST_RUN_PROFILE_KEY = "recall-first-run-profile-pending";
 const PROFILE_ONBOARDED_KEY = "recall-profile-onboarded-user";
 
 // ─── Demo baseline data (injected directly — no API call needed) ──────────────
+const nowMs = Date.now();
 const DEMO_MEMORIES = [
   {
     id: "launch-core",
@@ -27,6 +29,7 @@ const DEMO_MEMORIES = [
     type: "note",
     dateGroup: "Today",
     time: "9:41 AM",
+    createdAt: new Date(nowMs - 2 * 60 * 60 * 1000).toISOString(),
     tag: "Launch",
     sourceIds: ["customer-interview", "privacy-reference"],
     archived: false,
@@ -37,8 +40,9 @@ const DEMO_MEMORIES = [
     excerpt: "Competitive scan across 12 tools. Key differentiators: local storage, clear data export, and explicit AI usage disclosure. Messaging opportunity in trust.",
     type: "link",
     url: "https://example.com/privacy-ai-landscape",
-    dateGroup: "Today",
+    dateGroup: "Yesterday",
     time: "4:22 PM",
+    createdAt: new Date(nowMs - 26 * 60 * 60 * 1000).toISOString(),
     tag: "Research",
     sourceIds: ["privacy-reference", "launch-core"],
     archived: false,
@@ -51,6 +55,7 @@ const DEMO_MEMORIES = [
     imageUrl: demoMoodboardImg,
     dateGroup: "Yesterday",
     time: "11:07 AM",
+    createdAt: new Date(nowMs - 28 * 60 * 60 * 1000).toISOString(),
     tag: "Brand",
     sourceIds: ["launch-core", "market-landscape"],
     archived: false,
@@ -62,8 +67,9 @@ const DEMO_MEMORIES = [
     type: "voice",
     audioUrl: demoVoiceAudio,
     duration: "2:31",
-    dateGroup: "Yesterday",
+    dateGroup: "May 12",
     time: "7:36 PM",
+    createdAt: new Date("2024-05-12T19:36:00.000Z").toISOString(),
     tag: "Interview",
     sourceIds: ["launch-core"],
     archived: false,
@@ -75,6 +81,7 @@ const DEMO_MEMORIES = [
     type: "note",
     dateGroup: "May 12",
     time: "10:15 AM",
+    createdAt: new Date("2024-05-12T10:15:00.000Z").toISOString(),
     tag: "Reference",
     sourceIds: ["market-landscape", "launch-core"],
     archived: false,
@@ -86,6 +93,7 @@ const DEMO_MEMORIES = [
     type: "note",
     dateGroup: "May 10",
     time: "2:00 PM",
+    createdAt: new Date("2024-05-10T14:00:00.000Z").toISOString(),
     tag: "Product",
     sourceIds: ["customer-interview"],
     archived: false,
@@ -98,6 +106,7 @@ const DEMO_MEMORIES = [
     url: "https://example.com/competitor-analysis",
     dateGroup: "May 8",
     time: "3:45 PM",
+    createdAt: new Date("2024-05-08T15:45:00.000Z").toISOString(),
     tag: "Research",
     sourceIds: ["market-landscape"],
     archived: false,
@@ -183,6 +192,16 @@ export function App() {
   const [askOpen, setAskOpen] = useState(false);
   const [selectedMemory, setSelectedMemory] = useState(null);
   const [toast, setToast] = useState("");
+
+  const handleEditMemory = (memory) => {
+    setSelectedMemory(null);
+    setEditingMemory(memory);
+  };
+
+  const handleEditReminder = (reminder) => {
+    setSelectedMemory(null);
+    setEditingReminder(reminder);
+  };
   const [authLoading, setAuthLoading] = useState(true);
   const [showTour, setShowTour] = useState(false);
   const [mfaChallengeRequired, setMfaChallengeRequired] = useState(false);
@@ -722,14 +741,21 @@ export function App() {
   // ─── Data mutations ────────────────────────────────────────────────────────
   const addMemory = async (draft) => {
     const memoryId = crypto.randomUUID();
+    const now = new Date();
+    const createdAt = draft.createdAt || now.toISOString();
+    const time = draft.time || formatMemoryTime(now);
+    const dateGroup = draft.dateGroup || formatMemoryDateGroup(now);
+
     const memory = {
       ...draft,
       id: memoryId,
       title: draft.title || "Untitled thought",
       excerpt: draft.excerpt,
       type: draft.type,
-      dateGroup: "Today",
-      time: new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit" }).format(new Date()),
+      createdAt,
+      created_at: createdAt,
+      dateGroup,
+      time,
       tag: draft.type === "voice" ? "Voice" : "Inbox",
       url: draft.type === "image" ? draft.imageUrl : draft.url,
       fileName: draft.fileName,
@@ -1254,14 +1280,14 @@ export function App() {
         onTopOfMindMemory={topOfMindMemory}
         onMemoryUpsert={handleMemoryUpsert}
         onDeleteMemory={deleteMemory}
-        onEditReminder={(r) => setEditingReminder(r)}
+        onEditReminder={handleEditReminder}
         archivedMemories={archivedMemories}
         onEmptyArchive={emptyArchive}
         onDeleteArchivedMemories={deleteArchivedMemories}
         onNavigate={setActivePage}
         onSaveProfile={handleSaveProfile}
         onCapture={() => setCaptureOpen(true)}
-        onEditMemory={setEditingMemory}
+        onEditMemory={handleEditMemory}
         onSaveMemory={addMemory}
         onSearch={() => setSearchOpen(true)}
         onAsk={() => setAskOpen(true)}
@@ -1286,11 +1312,12 @@ export function App() {
             onClose={() => setSearchOpen(false)}
             onCapture={() => { setSearchOpen(false); setCaptureOpen(true); }}
             onSelect={(memory) => { setSearchOpen(false); setSelectedMemory(memory); }}
-            onEdit={setEditingMemory}
+            onEdit={(memory) => { setSearchOpen(false); handleEditMemory(memory); }}
           />
         ) : null}
         {editingMemory ? (
           <EditMemoryModal 
+            key={`edit-memory-${editingMemory.id || "active"}`}
             memory={editingMemory} 
             onClose={() => setEditingMemory(null)} 
             onSave={updateMemory} 
@@ -1298,23 +1325,25 @@ export function App() {
         ) : null}
         {editingReminder && (
           <EditReminderModal
+            key={`edit-reminder-${editingReminder.id || "active"}`}
             reminder={editingReminder}
             onClose={() => setEditingReminder(null)}
             onSave={editReminder}
           />
         )}
-        {selectedMemory ? (
+        {selectedMemory && !editingMemory && !editingReminder ? (
           <MemoryDrawer
             memory={selectedMemory}
             memories={visibleMemories}
             spaces={spaces}
             onLinkMemoryToSpace={linkMemoryToSpace}
+            onRemoveMemoryFromSpace={removeMemoryFromSpace}
             onNavigate={setSelectedMemory}
             onArchive={archiveMemory}
             onClose={() => setSelectedMemory(null)}
             onPin={pinMemory}
             onTopOfMind={topOfMindMemory}
-            onEdit={setEditingMemory}
+            onEdit={handleEditMemory}
             onDelete={deleteMemory}
           />
         ) : null}

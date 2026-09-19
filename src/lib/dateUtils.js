@@ -49,6 +49,102 @@ export function formatTime(timeStr) {
   return timeStr;
 }
 
+/**
+ * Format a Date object or ISO timestamp string into standard 12-hour "h:mm A" local time.
+ */
+export function formatMemoryTime(dateInput) {
+  if (!dateInput) return "";
+  if (typeof dateInput === "string" && (dateInput.includes("AM") || dateInput.includes("PM"))) {
+    return dateInput;
+  }
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) {
+    return typeof dateInput === "string" ? dateInput : "";
+  }
+  let h = d.getHours();
+  const m = String(d.getMinutes()).padStart(2, "0");
+  const ampm = h >= 12 ? "PM" : "AM";
+  h = h % 12;
+  if (h === 0) h = 12;
+  return `${h}:${m} ${ampm}`;
+}
+
+/**
+ * Formats a Date object or ISO timestamp string into a relative dateGroup label:
+ * "Today", "Yesterday", or "MMM D" (e.g. "Sep 19").
+ */
+export function formatMemoryDateGroup(dateInput) {
+  if (!dateInput) return "Today";
+  if (dateInput === "Today" || dateInput === "Yesterday") return dateInput;
+
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) {
+    return typeof dateInput === "string" ? dateInput : "Today";
+  }
+
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const targetStart = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diffDays = Math.round((todayStart - targetStart) / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays === -1) return "Tomorrow";
+
+  if (d.getFullYear() === now.getFullYear()) {
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+/**
+ * Dynamically resolves the accurate, localized dateGroup and time for any memory.
+ */
+export function getMemoryDateTime(memory) {
+  if (!memory) return { dateGroup: "Today", time: "" };
+
+  const timestamp = memory.createdAt || memory.created_at;
+  let dateGroup = memory.dateGroup;
+  let time = memory.time;
+
+  if (timestamp) {
+    const d = new Date(timestamp);
+    if (!isNaN(d.getTime())) {
+      dateGroup = formatMemoryDateGroup(d);
+      if (!time || time === "undefined") {
+        time = formatMemoryTime(d);
+      }
+    }
+  } else if (!dateGroup) {
+    dateGroup = "Today";
+  }
+
+  // Ensure time format is cleaned
+  if (time && (time.includes(":") && !time.includes("AM") && !time.includes("PM"))) {
+    time = formatTime(time);
+  }
+
+  return {
+    dateGroup: dateGroup || "Today",
+    time: time || ""
+  };
+}
+
+/**
+ * Provides a dynamic subheader for timeline date groups (e.g. "Sep 19" for "Today", "Sep 18" for "Yesterday")
+ */
+export function getTimelineDateLabel(group) {
+  const now = new Date();
+  if (group === "Today") {
+    return now.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }
+  if (group === "Yesterday") {
+    const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    return yesterday.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }
+  return "";
+}
+
 export function toYYYYMMDD(dueStr) {
   if (!dueStr) return "";
   if (dueStr.includes("-") && dueStr.length === 10) return dueStr; // already YYYY-MM-DD

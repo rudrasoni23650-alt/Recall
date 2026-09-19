@@ -1,6 +1,7 @@
 import { Bell, CaretDown, CirclesThreePlus, House, Sparkle, Stack, X, Folders, Clock } from "@phosphor-icons/react";
 import { motion } from "motion/react";
 import logoLightAlpha from "../assets/logo-light-alpha.png";
+import logoBlackAlpha from "../assets/logo-black-alpha.png";
 
 const navItems = [
   { id: "home", label: "Home", icon: House },
@@ -14,7 +15,8 @@ export function Sidebar({ session, activePage, onNavigate, onAsk, profileOpen, o
     <aside className="sidebar">
       <div>
         <motion.button className="brand" whileHover={{ scale: 1.02, x: 2 }} whileTap={{ scale: 0.96 }} transition={{ type: "spring", stiffness: 300, damping: 14 }} type="button" onClick={() => onNavigate("landing")} title="Go to landing page">
-          <img src={logoLightAlpha} alt="Recall Logo" className="brand-logo" /> Recall
+          <img src={logoLightAlpha} alt="Recall Logo" className="brand-logo brand-logo--light" />
+          <img src={logoBlackAlpha} alt="Recall Logo" className="brand-logo brand-logo--dark" /> Recall
         </motion.button>
         <span className="sidebar-label">Workspace</span>
         <nav className="primary-nav" aria-label="Main navigation">
@@ -25,7 +27,7 @@ export function Sidebar({ session, activePage, onNavigate, onAsk, profileOpen, o
         </nav>
         <div className="nav-rule" />
         <span className="sidebar-label sidebar-label--intelligence">Intelligence</span>
-        <motion.button className="ask-button" whileHover={{ scale: 1.02, y: -2, boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} whileTap={{ scale: 0.96 }} transition={{ type: "spring", stiffness: 300, damping: 14 }} type="button" onClick={onAsk}><Sparkle size={19} weight="duotone" /><span>Ask Recall</span></motion.button>
+        <motion.button style={{ outline: "none" }} className="ask-button" whileHover={{ scale: 1.02, y: -2, boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} whileTap={{ scale: 0.96 }} transition={{ type: "spring", stiffness: 300, damping: 14 }} type="button" onClick={onAsk}><Sparkle size={19} weight="duotone" /><span>Ask Recall</span></motion.button>
       </div>
       <div className="profile-wrap">
         <span className="sidebar-label sidebar-label--account">Your space</span>

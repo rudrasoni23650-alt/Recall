@@ -2,9 +2,11 @@ import {
   ArrowRight, ArrowSquareOut,
   Article, Bell, CheckSquare, Square, FileText, FilePdf,
   Highlighter, Image, Link, Play, Quotes,
-  VideoCamera, Waveform, PushPin, Star, PencilSimple, Sparkle
+  VideoCamera, Waveform, PushPin, Star, PencilSimple, Sparkle,
+  FolderMinus
 } from "@phosphor-icons/react";
 import fallbackBoardImg from "../assets/privacy-positioning-board.png";
+import { getMemoryDateTime } from "../lib/dateUtils";
 
 const typeDetails = {
   note:       { label: "Note",        Icon: FileText    },
@@ -21,7 +23,7 @@ const typeDetails = {
   reminder:   { label: "Reminder",    Icon: Bell        },
 };
 
-export function MemoryCard({ memory, onSelect, onEdit, variant = "library", context = "", isSelecting = false, isSelected = false }) {
+export function MemoryCard({ memory, onSelect, onEdit, variant = "library", context = "", isSelecting = false, isSelected = false, onRemoveFromSpace = null }) {
   const { label, Icon } = typeDetails[memory.type] ?? typeDetails.note;
   const isCompact = variant === "compact";
 
@@ -48,7 +50,7 @@ export function MemoryCard({ memory, onSelect, onEdit, variant = "library", cont
           {/* Indicator badges */}
           {/* Indicator badges */}
           {(memory.isPinned || memory.isTopOfMind || isSelecting) && (
-            <div className="memory-card-badges" style={{ right: (!isSelecting && onEdit && memory.processingStatus !== 'pending') ? '50px' : '10px' }}>
+            <div className="memory-card-badges" style={{ right: (!isSelecting && onEdit && memory.processingStatus !== 'pending' && onRemoveFromSpace) ? '88px' : (!isSelecting && (onEdit || onRemoveFromSpace)) ? '50px' : '10px' }}>
               {isSelecting && (
                 <span className="memory-badge memory-badge--select" style={{ background: isSelected ? 'var(--petrol-light)' : 'var(--canvas)' }}>
                   {isSelected ? <CheckSquare weight="fill" color="#fff" /> : <Square color="var(--muted)" />}
@@ -154,11 +156,44 @@ export function MemoryCard({ memory, onSelect, onEdit, variant = "library", cont
         </span>
       )}
 
+      {!isCompact && onRemoveFromSpace && !isSelecting && (
+        <span 
+          className="memory-card-remove-space-btn" 
+          onClick={(e) => { e.stopPropagation(); onRemoveFromSpace(memory); }}
+          style={{ 
+            position: "absolute", 
+            top: "12px", 
+            right: (!isCompact && onEdit && memory.processingStatus !== 'pending') ? "48px" : "12px", 
+            width: "32px", 
+            height: "32px", 
+            borderRadius: "50%", 
+            background: "var(--surface, #ffffff)", 
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "center",
+            color: "var(--coral, #ee4c26)",
+            zIndex: 10,
+            border: "1px solid var(--line)",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+            cursor: "pointer"
+          }}
+          title="Remove from this space"
+          aria-label="Remove from this space"
+        >
+          <FolderMinus size={16} />
+        </span>
+      )}
+
       <div className="memory-card-body">
-        <div className="memory-card-meta">
-          <span>{label}</span>
-          <span>{memory.dateGroup} · {memory.time}</span>
-        </div>
+        {(() => {
+          const { dateGroup, time } = getMemoryDateTime(memory);
+          return (
+            <div className="memory-card-meta">
+              <span>{label}</span>
+              <span>{dateGroup}{time ? ` · ${time}` : ''}</span>
+            </div>
+          );
+        })()}
         <h3>{memory.title}</h3>
         {memory.type === "note" && !memory.summary ? null : (
           <p>{memory.summary || memory.excerpt}</p>

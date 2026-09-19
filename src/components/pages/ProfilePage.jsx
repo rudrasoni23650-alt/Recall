@@ -113,7 +113,7 @@ export function ProfilePage({
     },
     {
       id: "apple-glass",
-      name: "Apple Frosted Glass",
+      name: "Frosted Glass",
       subtitle: "Liquid Translucency & Vibrant Blue",
       colors: {
         rail: "rgba(245, 247, 250, 0.85)",

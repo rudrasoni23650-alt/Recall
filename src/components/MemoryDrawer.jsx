@@ -3,11 +3,12 @@ import { ArrowLeft, ArrowUpRight, CheckSquare, House, PushPin, Sparkle, Star, Tr
 import { motion } from "motion/react";
 import { ReadingMode } from "./ReadingMode.jsx";
 import { apiFetch } from "../lib/api.js";
+import { getMemoryDateTime } from "../lib/dateUtils.js";
 
 
 const TYPE_ICON = { note: FileText, link: Link, image: Image, voice: Waveform };
 
-export function MemoryDrawer({ memory, memories, spaces = [], onLinkMemoryToSpace, onNavigate, onArchive, onClose, onPin, onTopOfMind, onEdit, onDelete }) {
+export function MemoryDrawer({ memory, memories, spaces = [], onLinkMemoryToSpace, onRemoveMemoryFromSpace, onNavigate, onArchive, onClose, onPin, onTopOfMind, onEdit, onDelete }) {
   const [history, setHistory] = useState([]);
   const [originalOpen, setOriginalOpen] = useState(false);
   const [showAddSpace, setShowAddSpace] = useState(false);
@@ -80,8 +81,10 @@ export function MemoryDrawer({ memory, memories, spaces = [], onLinkMemoryToSpac
     setOriginalOpen((value) => !value);
   };
 
+  const { dateGroup, time } = getMemoryDateTime(memory);
+
   const exportMemory = () => {
-    const content = `# ${memory.title}\n\n${memory.excerpt}\n\nType: ${memory.type}\nSaved: ${memory.dateGroup} at ${memory.time}`;
+    const content = `# ${memory.title}\n\n${memory.excerpt}\n\nType: ${memory.type}\nSaved: ${dateGroup}${time ? ` at ${time}` : ""}`;
     const url = URL.createObjectURL(new Blob([content], { type: "text/markdown" }));
     const anchor = document.createElement("a");
     anchor.href = url;
@@ -141,10 +144,10 @@ export function MemoryDrawer({ memory, memories, spaces = [], onLinkMemoryToSpac
     >
       <motion.aside
         className="memory-drawer"
-        initial={{ y: 40, scale: 0.95, opacity: 0 }}
-        animate={{ y: 0, scale: 1, opacity: 1 }}
-        exit={{ y: 40, scale: 0.95, opacity: 0 }}
-        transition={{ type: "spring", stiffness: 350, damping: 25 }}
+        initial={{ x: "100%", opacity: 0.5 }}
+        animate={{ x: 0, opacity: 1 }}
+        exit={{ x: "100%", opacity: 0.5 }}
+        transition={{ type: "spring", stiffness: 320, damping: 28 }}
         role="dialog"
         aria-modal="true"
         aria-label={`Memory: ${memory.title}`}
@@ -156,7 +159,7 @@ export function MemoryDrawer({ memory, memories, spaces = [], onLinkMemoryToSpac
                 <ArrowLeft />
               </button>
             ) : null}
-            <span>{memory.type} · {memory.dateGroup}</span>
+            <span>{memory.type} · {dateGroup}{time ? ` · ${time}` : ""}</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             {onEdit && (
@@ -255,7 +258,7 @@ export function MemoryDrawer({ memory, memories, spaces = [], onLinkMemoryToSpac
               </small>
             </span>
             <span>
-              {memory.dateGroup}
+              {dateGroup}
               {memory.url ? <ArrowSquareOut /> : null}
             </span>
           </button>
@@ -264,6 +267,7 @@ export function MemoryDrawer({ memory, memories, spaces = [], onLinkMemoryToSpac
 
           {sources.map((source) => {
             const SrcIcon = TYPE_ICON[source.type] ?? FileText;
+            const srcDate = getMemoryDateTime(source).dateGroup;
             return (
               <button className="drawer-source" type="button" key={source.id} onClick={() => navigateTo(source)}>
                 <SrcIcon />
@@ -271,7 +275,7 @@ export function MemoryDrawer({ memory, memories, spaces = [], onLinkMemoryToSpac
                   <strong>{source.title}</strong>
                   <small>{source.excerpt}</small>
                 </span>
-                <span>{source.dateGroup}</span>
+                <span>{srcDate}</span>
               </button>
             );
           })}
@@ -282,8 +286,51 @@ export function MemoryDrawer({ memory, memories, spaces = [], onLinkMemoryToSpac
           <h2><FolderPlus weight="fill" /> Connected Spaces</h2>
           <div className="drawer-spaces-list" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
             {connectedSpaces.map(space => (
-              <span key={space.id} className="drawer-space-tag" style={{ background: 'var(--petrol-light)', color: '#fff', padding: '4px 8px', borderRadius: '4px', fontSize: '12px' }}>
-                {space.title}
+              <span 
+                key={space.id} 
+                className="drawer-space-tag" 
+                style={{ 
+                  background: 'var(--petrol-light)', 
+                  color: '#fff', 
+                  padding: '4px 8px 4px 10px', 
+                  borderRadius: '6px', 
+                  fontSize: '12px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  lineHeight: '1.2'
+                }}
+              >
+                <span>{space.title}</span>
+                {onRemoveMemoryFromSpace && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemoveMemoryFromSpace(memory.id, space.id);
+                    }}
+                    style={{
+                      background: 'rgba(0, 0, 0, 0.2)',
+                      border: 'none',
+                      color: '#fff',
+                      borderRadius: '50%',
+                      width: '16px',
+                      height: '16px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      padding: 0,
+                      transition: 'all 0.15s ease'
+                    }}
+                    title={`Remove from ${space.title}`}
+                    aria-label={`Remove from ${space.title}`}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = '#ee4c26'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(0, 0, 0, 0.2)'; }}
+                  >
+                    <X size={10} weight="bold" />
+                  </button>
+                )}
               </span>
             ))}
             {connectedSpaces.length === 0 && <span style={{ color: 'var(--petrol-light)', opacity: 0.7, fontSize: '13px' }}>Not in any spaces yet.</span>}
