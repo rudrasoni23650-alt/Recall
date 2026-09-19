@@ -3284,14 +3284,18 @@ input:checked + .check-ring::after { content: ""; position: absolute; inset: 4px
 
 /* Welcome navigation bar styling */
 .welcome-nav {
-  background: transparent !important;
-  border-bottom: none !important;
+  background: rgba(6, 61, 61, 0.22) !important;
+  border-bottom: 1px solid rgba(246, 245, 236, 0.16) !important;
+  backdrop-filter: blur(18px) saturate(125%);
+  -webkit-backdrop-filter: blur(18px) saturate(125%);
   color: #eef5ed !important;
 }
 
 .hero-full-bg .welcome-nav {
-  background: transparent !important;
-  border-bottom: none !important;
+  background: rgba(6, 61, 61, 0.22) !important;
+  border-bottom: 1px solid rgba(246, 245, 236, 0.16) !important;
+  backdrop-filter: blur(18px) saturate(125%);
+  -webkit-backdrop-filter: blur(18px) saturate(125%);
   color: #eef5ed !important;
 }
 

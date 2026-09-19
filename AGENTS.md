@@ -21,6 +21,7 @@ When implementing from a selected generated mock, treat that image as the source
 
 - Welcome page is a complete product site: balanced hero, richer navigation, how it works, features, about, pricing, FAQ, final CTA, and footer.
 - Keep one continuous responsive outer gutter across the entire welcome page; the hero sits inside it as a rounded card rather than running full bleed.
+- Preserve the subtle 1px stroke (divider border) between the welcome navbar and the hero content.
 - The welcome hero animation autoplays once on landing, then remains paused on its final frame; never loop it.
 - Treat the welcome proof band as a distinct rounded card below the hero, with clear separation and evenly centered icon-and-copy groups.
 - Present welcome-page metrics as a compact, contextual editorial module rather than a sparse oversized counter strip.
@@ -39,3 +40,4 @@ When implementing from a selected generated mock, treat that image as the source
 - Home, Memories, Spaces, and Reminders all use a small eyebrow heading above the page title; Memories follows the same header spacing and panel rhythm as the other primary tabs.
 - Home and Memories render the same shared Memory Timeline component so grouping, spacing, rows, and interactions stay identical.
 - Memories is the product's visual library: render all saved types as recognizable, information-rich cards rather than a timeline. Use the same shared memory-card anatomy in compact form wherever memories appear inside Search, Spaces, and contextual rails; Home keeps its editorial resurfacing and timeline modules.
+- Ensure the browser favicon and touch icons crop tightly to the logo mark with minimal padding so the mark renders prominently and visibly in tabs and bookmarks.
