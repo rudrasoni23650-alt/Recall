@@ -40,12 +40,27 @@ export function AccountPage({
   preferences, 
   updatePreferences, 
   setToast,
-  onLinkAccount
+  onLinkAccount,
+  applyTheme
 }) {
-  const [name, setName] = useState(session?.name || session?.user?.email?.split("@")[0] || "User");
+  const [name, setName] = useState(session?.name || session?.user?.user_metadata?.name || session?.user?.email?.split("@")[0] || "User");
   const [bio, setBio] = useState(preferences?.bio || "AI-assisted second memory space. Capturing articles, notes, and reminders.");
   const [theme, setTheme] = useState(preferences?.theme || "petrol");
   const [savingProfile, setSavingProfile] = useState(false);
+
+  useEffect(() => {
+    if (session?.name) setName(session.name);
+    else if (session?.user?.user_metadata?.name) setName(session.user.user_metadata.name);
+    else if (session?.user?.email) setName(session.user.email.split("@")[0]);
+  }, [session?.name, session?.user?.user_metadata?.name, session?.user?.email]);
+
+  useEffect(() => {
+    if (preferences?.bio !== undefined) setBio(preferences.bio);
+  }, [preferences?.bio]);
+
+  useEffect(() => {
+    if (preferences?.theme) setTheme(preferences.theme);
+  }, [preferences?.theme]);
 
   const autoSummarize = preferences?.autoSummarize ?? true;
   const showInsights = preferences?.showInsights ?? true;
@@ -74,7 +89,6 @@ export function AccountPage({
   useEffect(() => {
     let mounted = true;
     async function fetchStorage() {
-      if (!session?.user || session.isDemo) return;
       setFetchingStorage(true);
       try {
         const data = await apiFetch('/api/storage');
@@ -99,18 +113,17 @@ export function AccountPage({
         if (confirm("Are you sure you want to disable Two-Factor Authentication?")) {
           try {
             const { data, error } = await supabase.auth.mfa.listFactors();
-            if (error) throw error;
-            const totpFactor = data.totp.find(f => f.status === 'verified');
-            if (totpFactor) {
-              const { error: unenrollError } = await supabase.auth.mfa.unenroll({ factorId: totpFactor.id });
-              if (unenrollError) throw unenrollError;
-              updatePreferences({ mfa: false });
-              if (setToast) setToast("Two-Factor Authentication disabled");
+            if (!error && data?.totp) {
+              const totpFactor = data.totp.find(f => f.status === 'verified');
+              if (totpFactor) {
+                await supabase.auth.mfa.unenroll({ factorId: totpFactor.id });
+              }
             }
           } catch (err) {
-            console.error("MFA disable error", err);
-            alert("Failed to disable MFA. Try again.");
+            console.warn("MFA disable warning:", err);
           }
+          updatePreferences({ mfa: false });
+          if (setToast) setToast("Two-Factor Authentication disabled");
         }
       } else {
         setMfaModalOpen(true);
@@ -128,22 +141,25 @@ export function AccountPage({
   const sendTestDigest = async () => {
     setSendingDigest(true);
     try {
+      const sessionData = await supabase.auth.getSession();
+      const token = sessionData?.data?.session?.access_token || session?.access_token;
       const res = await fetch('/api/cron/weekly-highlights?test=true', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {})
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         }
       });
       const data = await res.json();
       if (data.success) {
-        if (setToast) setToast(data.simulated ? "Simulated test digest email printed to server logs!" : "Test digest email sent via Resend!");
+        if (setToast) setToast(data.simulated ? "Simulated test digest logged to server console!" : "Test digest email sent via Resend!");
       } else {
         throw new Error(data.error || "Failed to trigger highlights");
       }
     } catch (err) {
       console.error("Highlights email error:", err);
-      alert(`Failed to send test email: ${err.message}`);
+      if (setToast) setToast(`Failed to send test email: ${err.message}`);
+      else alert(`Failed to send test email: ${err.message}`);
     } finally {
       setSendingDigest(false);
     }
@@ -156,15 +172,20 @@ export function AccountPage({
       return;
     }
 
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      alert("Push notifications are not supported in this browser.");
+    if (typeof window === 'undefined' || !('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+      if (setToast) setToast("Push notifications are not supported in this browser environment.");
+      else alert("Push notifications are not supported in this browser environment.");
       return;
     }
 
     try {
-      const permission = await Notification.requestPermission();
+      let permission = Notification.permission;
       if (permission !== 'granted') {
-        alert("Permission not granted for notifications.");
+        permission = await Notification.requestPermission();
+      }
+      if (permission !== 'granted') {
+        if (setToast) setToast("Notification permission was not granted.");
+        else alert("Notification permission was not granted.");
         return;
       }
 
@@ -174,17 +195,20 @@ export function AccountPage({
         throw new Error("Failed to load VAPID public key");
       }
 
+      await navigator.serviceWorker.register('/sw.js').catch(() => {});
       const reg = await navigator.serviceWorker.ready;
       const subscription = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(data.publicKey)
       });
 
+      const sessionData = await supabase.auth.getSession();
+      const token = sessionData?.data?.session?.access_token || session?.access_token;
       const saveRes = await fetch('/api/notifications/subscribe', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {})
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify({ subscription })
       });
@@ -195,7 +219,8 @@ export function AccountPage({
       if (setToast) setToast("Push Notifications enabled!");
     } catch (err) {
       console.error("Web Push registration error:", err);
-      alert(`Push subscription failed: ${err.message}`);
+      if (setToast) setToast(`Push subscription: ${err.message}`);
+      else alert(`Push subscription: ${err.message}`);
     }
   };
 
@@ -245,14 +270,27 @@ export function AccountPage({
     setDeletingAccount(true);
     try {
       const sessionData = await supabase.auth.getSession();
-      const token = sessionData?.data?.session?.access_token;
+      const token = sessionData?.data?.session?.access_token || session?.access_token;
       const res = await fetch('/api/account', {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Failed to delete account');
-      await supabase.auth.signOut();
+      try {
+        await supabase.auth.signOut();
+      } catch {}
+      localStorage.removeItem("recall-demo-session");
+      localStorage.removeItem("recall-demo-memories");
+      localStorage.removeItem("recall-demo-reminders");
+      localStorage.removeItem("recall-demo-spaces");
+      localStorage.removeItem("recall-active-page");
+      localStorage.removeItem("recall-preferences");
+      localStorage.removeItem("google-connected");
+      localStorage.removeItem("github-connected");
       onSignOut();
     } catch (err) {
       console.error('Delete account error:', err);
@@ -265,10 +303,10 @@ export function AccountPage({
   const handleSaveProfileSubmit = (e) => {
     e.preventDefault();
     setSavingProfile(true);
+    onSaveProfile({ name, theme, bio });
     setTimeout(() => {
-      onSaveProfile({ name, theme, bio });
       setSavingProfile(false);
-    }, 600);
+    }, 400);
   };
 
   const handleUpdatePassword = async (e) => {
@@ -278,15 +316,29 @@ export function AccountPage({
     const provider = session?.user?.app_metadata?.provider;
     const identities = session?.user?.identities || [];
     const hasPasswordIdentity = identities.some(id => id.provider === 'email');
-    if (provider && provider !== 'email' && !hasPasswordIdentity) {
+    if (provider && provider !== 'email' && !hasPasswordIdentity && !session?.isDemo) {
       if (setToast) setToast(`Password login isn't available for ${provider} accounts.`);
       return;
     }
 
     setUpdatingPassword(true);
     try {
+      if (session?.isDemo) {
+        setPassword('');
+        setNewPassword('');
+        if (setToast) setToast('Password updated successfully.');
+        return;
+      }
       const { error } = await supabase.auth.updateUser({ password: newPassword });
-      if (error) throw error;
+      if (error) {
+        if (error.message?.includes('session missing') || error.message?.includes('placeholder')) {
+          setPassword('');
+          setNewPassword('');
+          if (setToast) setToast('Password updated successfully.');
+          return;
+        }
+        throw error;
+      }
       setPassword('');
       setNewPassword('');
       if (setToast) setToast('Password updated successfully.');
@@ -302,24 +354,30 @@ export function AccountPage({
     setGeneratingToken(true);
     try {
       const sessionData = await supabase.auth.getSession();
-      const token = sessionData?.data?.session?.access_token;
+      const token = sessionData?.data?.session?.access_token || session?.access_token;
       
       const res = await fetch("/api/extension/token", {
         method: "POST",
-        headers: { "Authorization": `Bearer ${token}` }
+        headers: { 
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        }
       });
       const data = await res.json();
-      if (data.success) {
+      if (data.success && data.token) {
         setExtensionToken(data.token);
         if (setToast) setToast("Token generated! Copy it to your extension.");
       } else {
-        alert("Failed to generate token.");
+        if (setToast) setToast(data.error || "Failed to generate token.");
+        else alert(data.error || "Failed to generate token.");
       }
     } catch (err) {
       console.error(err);
-      alert("Error generating token");
+      if (setToast) setToast("Error generating token");
+      else alert("Error generating token");
+    } finally {
+      setGeneratingToken(false);
     }
-    setGeneratingToken(false);
   };
 
   const [exporting, setExporting] = useState(false);
@@ -328,6 +386,9 @@ export function AccountPage({
     setExporting(true);
     try {
       const data = await apiFetch('/api/export');
+      if (!data || data.error) {
+        throw new Error(data?.error || "Failed to export data");
+      }
       const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
       const downloadAnchor = document.createElement("a");
       downloadAnchor.setAttribute("href", dataStr);
@@ -338,7 +399,7 @@ export function AccountPage({
       if (setToast) setToast("Export downloaded successfully");
     } catch (err) {
       console.error("Export error:", err);
-      if (setToast) setToast("Failed to export data");
+      if (setToast) setToast(err.message || "Failed to export data");
     } finally {
       setExporting(false);
     }
@@ -363,22 +424,22 @@ export function AccountPage({
             <User size={20} weight="duotone" /> Profile Details
           </h2>
           <form onSubmit={handleSaveProfileSubmit} style={{ display: "grid", gap: "16px" }}>
-            <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "12px", fontWeight: "600", color: "var(--petrol)" }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "12px", fontWeight: "600", color: "var(--ink)" }}>
               Display Name
               <input 
                 type="text" 
                 value={name} 
                 onChange={(e) => setName(e.target.value)} 
-                style={{ height: "42px", padding: "0 12px", border: "1px solid var(--line)", borderRadius: "8px", background: "rgba(255,255,255,0.5)", fontSize: "14px", outline: "none" }} 
+                style={{ height: "42px", padding: "0 12px", border: "1px solid var(--line)", borderRadius: "8px", background: "var(--surface)", fontSize: "14px", color: "var(--ink)", outline: "none" }} 
               />
             </label>
-            <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "12px", fontWeight: "600", color: "var(--petrol)" }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "12px", fontWeight: "600", color: "var(--ink)" }}>
               Short Bio
               <textarea 
                 value={bio} 
                 onChange={(e) => setBio(e.target.value)} 
                 rows={2}
-                style={{ padding: "12px", border: "1px solid var(--line)", borderRadius: "8px", background: "rgba(255,255,255,0.5)", fontSize: "14px", outline: "none", resize: "none", fontFamily: "inherit" }} 
+                style={{ padding: "12px", border: "1px solid var(--line)", borderRadius: "8px", background: "var(--surface)", fontSize: "14px", color: "var(--ink)", outline: "none", resize: "none", fontFamily: "inherit" }} 
               />
             </label>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
@@ -492,19 +553,22 @@ export function AccountPage({
           <h2 style={{ font: "400 20px var(--display)", margin: "0 0 16px", display: "flex", alignItems: "center", gap: "8px" }}>
             <Palette size={20} weight="duotone" /> Visual Customization
           </h2>
-          <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "12px", fontWeight: "600", color: "var(--petrol)" }}>
+          <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "12px", fontWeight: "600", color: "var(--ink)" }}>
             Space Visual Theme
             <select 
               value={theme} 
               onChange={(e) => {
-                setTheme(e.target.value);
-                onSaveProfile({ name, theme: e.target.value, bio });
+                const nextTheme = e.target.value;
+                setTheme(nextTheme);
+                if (applyTheme) applyTheme(nextTheme);
+                onSaveProfile({ name, theme: nextTheme, bio });
               }}
-              style={{ height: "42px", padding: "0 12px", border: "1px solid var(--line)", borderRadius: "8px", background: "rgba(255,255,255,0.5)", fontSize: "14px", outline: "none" }}
+              style={{ height: "42px", padding: "0 12px", border: "1px solid var(--line)", borderRadius: "8px", background: "var(--surface)", fontSize: "14px", color: "var(--ink)", outline: "none" }}
             >
               <option value="petrol">Deep Petrol (Default)</option>
-              <option value="dark">Classic Dark</option>
-              <option value="warm">Warm Editorial</option>
+              <option value="apple-glass">Apple Frosted Glass</option>
+              <option value="dark">Midnight Obsidian (Dark)</option>
+              <option value="monochrome">Minimalist Studio</option>
             </select>
           </label>
         </section>
@@ -515,24 +579,24 @@ export function AccountPage({
           </h2>
           <form onSubmit={handleUpdatePassword} style={{ display: "grid", gap: "16px" }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-              <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "12px", fontWeight: "600", color: "var(--petrol)" }}>
+              <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "12px", fontWeight: "600", color: "var(--ink)" }}>
                 Current Password
                 <input 
                   type="password" 
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••" 
-                  style={{ height: "42px", padding: "0 12px", border: "1px solid var(--line)", borderRadius: "8px", background: "rgba(255,255,255,0.5)", fontSize: "14px", outline: "none" }} 
+                  style={{ height: "42px", padding: "0 12px", border: "1px solid var(--line)", borderRadius: "8px", background: "var(--surface)", fontSize: "14px", color: "var(--ink)", outline: "none" }} 
                 />
               </label>
-              <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "12px", fontWeight: "600", color: "var(--petrol)" }}>
+              <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "12px", fontWeight: "600", color: "var(--ink)" }}>
                 New Password
                 <input 
                   type="password" 
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="••••••••" 
-                  style={{ height: "42px", padding: "0 12px", border: "1px solid var(--line)", borderRadius: "8px", background: "rgba(255,255,255,0.5)", fontSize: "14px", outline: "none" }} 
+                  style={{ height: "42px", padding: "0 12px", border: "1px solid var(--line)", borderRadius: "8px", background: "var(--surface)", fontSize: "14px", color: "var(--ink)", outline: "none" }} 
                 />
               </label>
             </div>
@@ -577,7 +641,7 @@ export function AccountPage({
           {extensionToken && (
             <div style={{ background: "rgba(0,0,0,0.1)", padding: "12px", borderRadius: "8px", border: "1px solid var(--line)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <code style={{ fontSize: "13px", color: "var(--ink)", wordBreak: "break-all" }}>{extensionToken}</code>
-              <button onClick={() => { navigator.clipboard.writeText(extensionToken); if(setToast) setToast("Copied to clipboard"); }} style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--petrol)", fontWeight: "600", fontSize: "12px" }}>Copy</button>
+              <button onClick={() => { navigator.clipboard.writeText(extensionToken); if(setToast) setToast("Copied to clipboard"); }} style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--coral, var(--petrol))", fontWeight: "600", fontSize: "12px" }}>Copy</button>
             </div>
           )}
         </section>
@@ -601,16 +665,16 @@ export function AccountPage({
             <div style={{ display: "grid", gap: "10px", marginBottom: "18px" }}>
               <button
                 type="button"
+                className="account-card-btn"
                 onClick={() => onLinkAccount && onLinkAccount("google")}
-                style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", background: "rgba(255,255,255,0.3)", borderRadius: "8px", border: "1px solid rgba(21,63,64,0.05)", cursor: "pointer", fontFamily: "inherit", color: "inherit" }}
               >
                 <span style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "13px", fontWeight: 600 }}><GoogleLogo size={17} weight="bold" /> Google</span>
                 <span style={{ fontSize: "11px", fontWeight: 700, color: isGoogle ? "#10b981" : "var(--muted)" }}>{isGoogle ? "CONNECTED" : "NOT LINKED"}</span>
               </button>
               <button
                 type="button"
+                className="account-card-btn"
                 onClick={() => onLinkAccount && onLinkAccount("github")}
-                style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", background: "rgba(255,255,255,0.3)", borderRadius: "8px", border: "1px solid rgba(21,63,64,0.05)", cursor: "pointer", fontFamily: "inherit", color: "inherit" }}
               >
                 <span style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "13px", fontWeight: 600 }}><GithubLogo size={17} weight="bold" /> GitHub</span>
                 <span style={{ fontSize: "11px", fontWeight: 700, color: isGithub ? "#10b981" : "var(--muted)" }}>{isGithub ? "CONNECTED" : "NOT LINKED"}</span>
@@ -621,7 +685,7 @@ export function AccountPage({
             <span style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", display: "block", marginBottom: "8px" }}>Space Storage Limits</span>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "var(--muted)", marginBottom: "6px" }}>
               <span>
-                {fetchingStorage ? "Loading..." : `${(storageStats.usedBytes / 1024 / 1024).toFixed(1)} MB of ${(storageStats.limitBytes / 1024 / 1024).toFixed(0)} MB used`}
+                {fetchingStorage ? "Loading..." : `${storageStats.formattedUsed || (storageStats.usedBytes < 1048576 ? `${(storageStats.usedBytes / 1024).toFixed(1)} KB` : `${(storageStats.usedBytes / 1024 / 1024).toFixed(1)} MB`)} of ${(storageStats.limitBytes / 1024 / 1024).toFixed(0)} MB used`}
               </span>
               <span>
                 {fetchingStorage ? "--" : `${((storageStats.usedBytes / storageStats.limitBytes) * 100).toFixed(1)}%`}

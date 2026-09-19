@@ -60,10 +60,32 @@ export function CaptureModal({ onClose, onSave }) {
   const [error, setError]         = useState("");
   const [activeGroup, setActiveGroup] = useState("write");
 
-  const recorderRef = useRef(null);
-  const streamRef   = useRef(null);
-  const chunksRef   = useRef([]);
-  const metaTimerRef = useRef(null);
+  // Audio transcription state (gemini-3.5-transcribe)
+  const [transcribing, setTranscribing] = useState(false);
+  const [transcript, setTranscript] = useState("");
+  const [transcribeError, setTranscribeError] = useState("");
+  const [audioFileName, setAudioFileName] = useState("");
+  const [recordedBlob, setRecordedBlob] = useState(null);
+  const [copied, setCopied] = useState(false);
+
+  const recorderRef    = useRef(null);
+  const streamRef      = useRef(null);
+  const chunksRef      = useRef([]);
+  const metaTimerRef   = useRef(null);
+  const recognitionRef = useRef(null);
+  const liveSpeechRef  = useRef("");
+
+  // Lock background scrolling while capture modal is open
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    const originalTouchAction = document.body.style.touchAction;
+    document.body.style.overflow = "hidden";
+    document.body.style.touchAction = "none";
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.touchAction = originalTouchAction;
+    };
+  }, []);
 
   // Recording timer
   useEffect(() => {
@@ -121,36 +143,198 @@ export function CaptureModal({ onClose, onSave }) {
     }, 900);
   };
 
+  // ── Audio transcription helper ───────────────────────────────────────────────
+  const transcribeAudioData = async (blobOrFile, explicitMime) => {
+    if (!blobOrFile) return;
+    if (blobOrFile.size < 60) {
+      setTranscribeError("Recording was too short. Please speak a sentence and tap stop.");
+      return;
+    }
+    setTranscribing(true);
+    setTranscribeError("");
+    try {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        try {
+          const rawResult = reader.result || "";
+          const mimeType = explicitMime || blobOrFile.type || "audio/webm";
+
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 35000);
+
+          const res = await fetch("/api/ai/transcribe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              audioBase64: rawResult,
+              mimeType,
+            }),
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+
+          const data = await res.json();
+          if (data && data.transcript) {
+            const cleanTranscript = data.transcript.trim();
+            setTranscript(cleanTranscript);
+            setText(cleanTranscript);
+            setTranscribeError("");
+            if (!title) {
+              const firstSnippet = cleanTranscript.split(/\n|\.|\?/)[0].slice(0, 50);
+              if (firstSnippet) {
+                setTitle(firstSnippet.charAt(0).toUpperCase() + firstSnippet.slice(1));
+              }
+            }
+          } else if (!text.trim()) {
+            setTranscribeError("Audio captured. You can add or edit your notes above.");
+          }
+        } catch (err) {
+          console.warn("Transcribe API notice:", err);
+          // If we already have live-transcribed text, do not show error
+          if (!text.trim()) {
+            if (err.name === "AbortError") {
+              setTranscribeError("Audio captured. You can edit your thought notes directly.");
+            } else {
+              setTranscribeError("Audio captured. You can edit or complete your note above.");
+            }
+          }
+        } finally {
+          setTranscribing(false);
+        }
+      };
+      reader.readAsDataURL(blobOrFile);
+    } catch (err) {
+      console.error("FileReader error:", err);
+      setTranscribeError("Could not read audio data.");
+      setTranscribing(false);
+    }
+  };
+
+  const handleAudioUpload = (e) => {
+    const uploaded = e.target.files?.[0];
+    if (!uploaded) return;
+    setError("");
+    if (audioUrl) URL.revokeObjectURL(audioUrl);
+    const objectUrl = URL.createObjectURL(uploaded);
+    setAudioUrl(objectUrl);
+    setAudioFileName(uploaded.name);
+    setRecordedBlob(uploaded);
+    transcribeAudioData(uploaded, uploaded.type || "audio/mpeg");
+  };
+
+  const handleTrySampleAudio = async () => {
+    try {
+      setError("");
+      setAudioFileName("demo-voice-interview.wav");
+      const res = await fetch("/src/assets/demo-voice-interview.wav");
+      const blob = await res.blob();
+      if (audioUrl) URL.revokeObjectURL(audioUrl);
+      const objectUrl = URL.createObjectURL(blob);
+      setAudioUrl(objectUrl);
+      setRecordedBlob(blob);
+      transcribeAudioData(blob, "audio/wav");
+    } catch (err) {
+      console.warn("Could not load sample audio:", err);
+    }
+  };
+
   // ── Voice recording ──────────────────────────────────────────────────────────
   const startRecording = async () => {
     setError("");
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
-      setError("Browser recording unavailable. Upload an audio file instead.");
+      setError("Browser recording unavailable. Upload an audio file or try the sample voice note.");
       return;
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      streamRef.current  = stream;
+      let options = {};
+      if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+        options = { mimeType: 'audio/webm;codecs=opus' };
+      } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+        options = { mimeType: 'audio/webm' };
+      } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+        options = { mimeType: 'audio/mp4' };
+      }
+
+      const recorder = options.mimeType ? new MediaRecorder(stream, options) : new MediaRecorder(stream);
+      streamRef.current   = stream;
       recorderRef.current = recorder;
-      chunksRef.current  = [];
-      recorder.ondataavailable = (e) => e.data.size && chunksRef.current.push(e.data);
+      chunksRef.current   = [];
+      liveSpeechRef.current = "";
+
+      // Initialize live speech recognition if browser supports it
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        try {
+          const rec = new SpeechRecognition();
+          rec.continuous = true;
+          rec.interimResults = true;
+          rec.lang = navigator.language || "en-US";
+          rec.onresult = (e) => {
+            let combined = "";
+            for (let i = 0; i < e.results.length; i++) {
+              combined += e.results[i][0].transcript + " ";
+            }
+            if (combined.trim()) {
+              liveSpeechRef.current = combined.trim();
+              setText(combined.trim());
+              setTranscript(combined.trim());
+            }
+          };
+          rec.onerror = () => {};
+          rec.start();
+          recognitionRef.current = rec;
+        } catch {
+          /* browser speech recognition unavailable or denied */
+        }
+      }
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
+      };
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
-        setAudioUrl(URL.createObjectURL(blob));
+        if (recognitionRef.current) {
+          try { recognitionRef.current.stop(); } catch {}
+          recognitionRef.current = null;
+        }
+
+        const mimeType = recorder.mimeType || "audio/webm";
+        const blob = new Blob(chunksRef.current, { type: mimeType });
+        const objectUrl = URL.createObjectURL(blob);
+        setAudioUrl(objectUrl);
+        setRecordedBlob(blob);
+        setAudioFileName("");
         stream.getTracks().forEach(t => t.stop());
         setRecording(false);
+
+        // If live speech recognition already got words, pre-populate title
+        if (liveSpeechRef.current && !title) {
+          const firstSnippet = liveSpeechRef.current.split(/\n|\.|\?/)[0].slice(0, 50);
+          if (firstSnippet) {
+            setTitle(firstSnippet.charAt(0).toUpperCase() + firstSnippet.slice(1));
+          }
+        }
+
+        // Run full multimodal transcription to ensure pristine punctuation and complete text
+        transcribeAudioData(blob, mimeType);
       };
-      recorder.start();
+      recorder.start(300);
       setElapsed(0);
       setRecording(true);
     } catch {
-      setError("Microphone access denied. Choose Upload to add an existing recording.");
+      setError("Microphone access was not granted. You can upload an audio file or try the sample voice note below.");
     }
   };
 
-  const stopRecording = () =>
-    recorderRef.current?.state === "recording" && recorderRef.current.stop();
+  const stopRecording = () => {
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch {}
+      recognitionRef.current = null;
+    }
+    if (recorderRef.current?.state === "recording") {
+      recorderRef.current.stop();
+    }
+  };
 
   const formattedElapsed = `${String(Math.floor(elapsed / 60)).padStart(2, "0")}:${String(elapsed % 60).padStart(2, "0")}`;
 
@@ -165,7 +349,7 @@ export function CaptureModal({ onClose, onSave }) {
   const canSave  = isFileType
     ? !!file
     : isVoice
-    ? !!audioUrl
+    ? (!!audioUrl || !!transcript.trim())
     : !!text.trim() && validUrl;
 
   // ── File upload helper ───────────────────────────────────────────────────────
@@ -216,7 +400,7 @@ export function CaptureModal({ onClose, onSave }) {
     const autoTitle =
       isLinkType  ? (() => { try { return new URL(cleanText).hostname.replace("www.", ""); } catch { return cleanText.slice(0, 64); } })() :
       isFileType  ? (file?.name || "Uploaded file") :
-      isVoice     ? "Recorded thought" :
+      isVoice     ? (transcript ? (transcript.split(/\n|\.|:/)[0].slice(0, 50) || "Recorded thought") : (audioFileName || "Recorded thought")) :
       type === "quote" ? `"${cleanText.slice(0, 60)}…"` :
       type === "todo"  ? cleanText.split(/\n/)[0].slice(0, 64) :
       cleanText.split(/\n|\.|:/)[0].slice(0, 64);
@@ -232,10 +416,19 @@ export function CaptureModal({ onClose, onSave }) {
         const uploadedUrl = await uploadFile(file);
         if (type === "pdf") finalFileUrl  = uploadedUrl;
         else                finalImageUrl = uploadedUrl;
-      } else if (isVoice && audioUrl) {
-        const blob = await fetch(audioUrl).then(r => r.blob());
-        const audioFile = new File([blob], `voice-${Date.now()}.wav`, { type: blob.type || "audio/wav" });
-        finalAudioUrl = await uploadFile(audioFile);
+      } else if (isVoice && (recordedBlob || audioUrl)) {
+        let audioFile;
+        if (recordedBlob instanceof File) {
+          audioFile = recordedBlob;
+        } else if (recordedBlob) {
+          audioFile = new File([recordedBlob], `voice-${Date.now()}.wav`, { type: recordedBlob.type || "audio/wav" });
+        } else if (audioUrl) {
+          const blob = await fetch(audioUrl).then(r => r.blob());
+          audioFile = new File([blob], `voice-${Date.now()}.wav`, { type: blob.type || "audio/wav" });
+        }
+        if (audioFile) {
+          finalAudioUrl = await uploadFile(audioFile);
+        }
       }
     } catch (err) {
       console.error("Upload error:", err);
@@ -248,7 +441,7 @@ export function CaptureModal({ onClose, onSave }) {
     const excerpt =
       isLinkType  ? `Saved from ${(() => { try { return new URL(cleanText).hostname; } catch { return cleanText; } })()}` :
       isFileType  ? `Uploaded ${file?.name} · ${Math.max(1, Math.round((file?.size || 0) / 1024))} KB` :
-      isVoice     ? `Recorded voice note · ${formattedElapsed}` :
+      isVoice     ? (transcript ? `${transcript.slice(0, 100)}${transcript.length > 100 ? "…" : ""}` : `Recorded voice note · ${formattedElapsed}`) :
       type === "quote" ? cleanText :
       type === "todo"  ? cleanText :
       cleanText;
@@ -261,7 +454,8 @@ export function CaptureModal({ onClose, onSave }) {
       title:         memoryTitle,
       excerpt,
       url:           isLinkType ? cleanText : undefined,
-      fileName:      file?.name,
+      text:          isVoice ? (transcript || cleanText) : cleanText,
+      fileName:      file?.name || audioFileName,
       audioUrl:      finalAudioUrl || undefined,
       imageUrl:      finalImageUrl,
       fileUrl:       finalFileUrl,
@@ -295,6 +489,8 @@ export function CaptureModal({ onClose, onSave }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="capture-title"
+        onWheel={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.stopPropagation()}
       >
         <header>
           <div>
@@ -391,19 +587,99 @@ export function CaptureModal({ onClose, onSave }) {
 
           {/* Voice recorder */}
           {isVoice && (
-            <div className={recording ? "recorder is-recording" : "recorder"}>
-              <button onClick={recording ? stopRecording : startRecording}>
-                {recording ? <Stop weight="fill" /> : <Microphone weight="fill" />}
-              </button>
-              <div>
-                <strong>{recording ? `Recording ${formattedElapsed}` : audioUrl ? "Recording ready" : "Ready to record"}</strong>
-                <span>{recording ? "Tap stop when the thought is complete." : audioUrl ? "Listen back before saving." : "Your browser will ask for microphone access."}</span>
+            <>
+              <div className={recording ? "recorder is-recording" : "recorder"}>
+                <button onClick={recording ? stopRecording : startRecording}>
+                  {recording ? <Stop weight="fill" /> : <Microphone weight="fill" />}
+                </button>
+                <div>
+                  <strong>{recording ? `Recording ${formattedElapsed}` : audioFileName ? audioFileName : audioUrl ? "Recording ready" : "Ready to record"}</strong>
+                  <span>{recording ? "Tap stop when the thought is complete." : audioUrl ? "Listen back or review transcription below." : "Speak your thought, or upload an audio file."}</span>
+                </div>
+                <div className="wave-bars" aria-hidden="true">
+                  {Array.from({ length: 18 }, (_, i) => <i key={i} />)}
+                </div>
+                {audioUrl ? <audio controls src={audioUrl} /> : null}
+
+                <div className="recorder-audio-upload">
+                  <span>Or upload an audio file:</span>
+                  <label className="recorder-upload-label">
+                    <FileArrowUp weight="bold" />
+                    <span>Choose audio file</span>
+                    <input
+                      type="file"
+                      accept="audio/*,.mp3,.wav,.m4a,.webm,.ogg,.aac"
+                      onChange={handleAudioUpload}
+                      style={{ display: "none" }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="recorder-sample-btn"
+                    onClick={handleTrySampleAudio}
+                    title="Load sample audio interview to test transcription"
+                  >
+                    <Sparkle weight="bold" />
+                    <span>Try sample voice</span>
+                  </button>
+                </div>
               </div>
-              <div className="wave-bars" aria-hidden="true">
-                {Array.from({ length: 18 }, (_, i) => <i key={i} />)}
-              </div>
-              {audioUrl ? <audio controls src={audioUrl} /> : null}
-            </div>
+
+              {/* Transcribed audio box right below recording bar */}
+              {(transcribing || transcript || transcribeError) && (
+                <div className="transcription-container" id="audio-transcription-box">
+                  <div className="transcription-header">
+                    <div className="transcription-title-wrap">
+                      <Sparkle weight="fill" className="transcription-icon" />
+                      <strong>Transcribed Audio</strong>
+                      <span className="transcription-model-tag">Gemini Voice AI</span>
+                    </div>
+                    {transcribing && (
+                      <span className="transcription-status">
+                        <span className="transcription-spinner" />
+                        Transcribing with Gemini...
+                      </span>
+                    )}
+                  </div>
+
+                  {transcribing ? (
+                    <div className="transcription-skeleton">
+                      <div className="skeleton-line" />
+                      <div className="skeleton-line short" />
+                    </div>
+                  ) : transcribeError ? (
+                    <p className="transcription-error">{transcribeError}</p>
+                  ) : transcript ? (
+                    <div className="transcription-body">
+                      <textarea
+                        className="transcription-textarea"
+                        value={transcript}
+                        onChange={(e) => {
+                          setTranscript(e.target.value);
+                          setText(e.target.value);
+                        }}
+                        placeholder="Transcribed audio will appear here..."
+                        rows={3}
+                      />
+                      <div className="transcription-footer">
+                        <span>Editable transcription · Saved with this memory</span>
+                        <button
+                          type="button"
+                          className="transcription-copy-btn"
+                          onClick={() => {
+                            navigator.clipboard.writeText(transcript);
+                            setCopied(true);
+                            setTimeout(() => setCopied(false), 1800);
+                          }}
+                        >
+                          {copied ? "Copied to clipboard!" : "Copy text"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+            </>
           )}
 
           {/* Reminder time pickers */}

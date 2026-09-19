@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, useScroll, useTransform } from "motion/react";
 import {
   ArrowDown,
@@ -99,8 +99,21 @@ export function WelcomeScreen({ session, onEnter, onNavigateToApp }) {
     return () => window.removeEventListener("recall:open-auth", handler);
   }, []);
 
+  const heroVideoRef = useRef(null);
+  useEffect(() => {
+    if (heroVideoRef.current) {
+      heroVideoRef.current.play().catch(() => {});
+    }
+  }, []);
+
+  useEffect(() => {
+    // Defensively enforce the default canonical theme on documentElement while on the landing page
+    const root = document.documentElement;
+    root.setAttribute("data-theme", "petrol");
+  }, []);
+
   return (
-    <main className="welcome-shell">
+    <main className="welcome-shell" data-theme="petrol">
       <div className="welcome-frame">
         <section className="welcome-hero hero-full-bg" id="top">
           <div 
@@ -116,8 +129,10 @@ export function WelcomeScreen({ session, onEnter, onNavigateToApp }) {
             }}
           >
             <video
+              ref={heroVideoRef}
               src={heroNotebookAnimation}
-              poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+              poster="/hero-notebook-poster.webp"
+              preload="auto"
               style={{
                 display: "block",
                 width: "100%",

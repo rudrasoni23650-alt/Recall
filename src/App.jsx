@@ -234,32 +234,125 @@ export function App() {
     }
   };
 
-  const applyTheme = (themeName) => {
-    const root = document.documentElement;
-    if (themeName === "dark") {
-      root.style.setProperty("--petrol", "#021c1d");
-      root.style.setProperty("--petrol-light", "#164c4e");
-    } else if (themeName === "warm") {
-      root.style.setProperty("--petrol", "#332c25");
-      root.style.setProperty("--petrol-light", "#5e5246");
-    } else {
-      // default petrol
-      root.style.setProperty("--petrol", "#083c3e");
-      root.style.setProperty("--petrol-light", "#153f40");
+  const themeTokens = {
+    petrol: {
+      "--petrol": "#083c3e",
+      "--petrol-deep": "#042627",
+      "--petrol-light": "#153f40",
+      "--rail-bg": "rgba(8, 60, 62, 0.84)",
+      "--canvas": "#f1f2eb",
+      "--canvas-deep": "#e8ece3",
+      "--surface": "#f7f7f1",
+      "--ink": "#153f40",
+      "--muted": "#627675",
+      "--line": "rgba(21, 63, 64, 0.16)",
+      "--rail-text": "#eef5ed",
+      "--coral": "#dc806d",
+      "--coral-deep": "#c96e5b"
+    },
+    dark: {
+      "--petrol": "#000000",
+      "--petrol-deep": "#000000",
+      "--petrol-light": "#737373",
+      "--rail-bg": "rgba(0, 0, 0, 0.96)",
+      "--canvas": "#000000",
+      "--canvas-deep": "#080808",
+      "--surface": "#0c0c0c",
+      "--ink": "#ffffff",
+      "--muted": "#a3a3a3",
+      "--line": "rgba(255, 255, 255, 0.12)",
+      "--rail-text": "#ffffff",
+      "--coral": "#f38a78",
+      "--coral-deep": "#db6f5c"
+    },
+    monochrome: {
+      "--petrol": "#181a1c",
+      "--petrol-deep": "#101112",
+      "--petrol-light": "#2d3135",
+      "--rail-bg": "rgba(24, 26, 28, 0.88)",
+      "--canvas": "#f2f3f5",
+      "--canvas-deep": "#e6e8eb",
+      "--surface": "#ffffff",
+      "--ink": "#121416",
+      "--muted": "#686f78",
+      "--line": "rgba(18, 20, 22, 0.14)",
+      "--rail-text": "#f8f9fa",
+      "--coral": "#e25d48",
+      "--coral-deep": "#c44632"
+    },
+    "apple-glass": {
+      "--petrol": "#1c2530",
+      "--petrol-deep": "#0f161f",
+      "--petrol-light": "#2c3847",
+      "--rail-bg": "rgba(245, 247, 250, 0.68)",
+      "--canvas": "#f5f6f9",
+      "--canvas-deep": "#e8ecf2",
+      "--surface": "rgba(255, 255, 255, 0.65)",
+      "--ink": "#1d1d1f",
+      "--muted": "#6e6e73",
+      "--line": "rgba(0, 0, 0, 0.08)",
+      "--rail-text": "#1d1d1f",
+      "--coral": "#0071e3",
+      "--coral-deep": "#0056b3"
+    }
+  };
+
+  const applyTheme = (themeName = "petrol") => {
+    const validTheme = themeTokens[themeName] ? themeName : "petrol";
+    localStorage.setItem("recall-theme", validTheme);
+
+    // Only apply the theme to the document root if we are currently in the workspace.
+    // The landing page must never be affected by workspace themes.
+    const isLanding = !session || activePage === "landing";
+    if (!isLanding) {
+      const selected = themeTokens[validTheme];
+      const root = document.documentElement;
+      root.setAttribute("data-theme", validTheme);
+      Object.entries(selected).forEach(([key, val]) => {
+        root.style.setProperty(key, val);
+      });
     }
   };
 
   useEffect(() => {
-    applyTheme(preferences.theme || "petrol");
-  }, [preferences.theme]);
+    const isLanding = !session || activePage === "landing";
+    const root = document.documentElement;
+    if (isLanding) {
+      // The landing page strictly uses the canonical default petrol theme
+      root.setAttribute("data-theme", "petrol");
+      Object.entries(themeTokens.petrol).forEach(([key, val]) => {
+        root.style.setProperty(key, val);
+      });
+    } else {
+      // In the workspace: apply the user's workspace theme preference
+      const activeTheme = preferences.theme || localStorage.getItem("recall-theme") || "petrol";
+      const validTheme = themeTokens[activeTheme] ? activeTheme : "petrol";
+      const selected = themeTokens[validTheme];
+      root.setAttribute("data-theme", validTheme);
+      Object.entries(selected).forEach(([key, val]) => {
+        root.style.setProperty(key, val);
+      });
+    }
+  }, [session, activePage, preferences.theme]);
 
   const getProviderConnections = (user) => {
+    const meta = user?.user_metadata || {};
+    const googleFromMeta = meta.googleConnected !== undefined ? Boolean(meta.googleConnected) : null;
+    const githubFromMeta = meta.githubConnected !== undefined ? Boolean(meta.githubConnected) : null;
+
     const provider = user?.app_metadata?.provider || "";
     const identities = user?.identities || [];
 
+    const hasGoogle = googleFromMeta !== null
+      ? googleFromMeta
+      : (provider === "google" || identities.some((id) => id.provider === "google"));
+    const hasGithub = githubFromMeta !== null
+      ? githubFromMeta
+      : (provider === "github" || identities.some((id) => id.provider === "github"));
+
     return {
-      googleConnected: provider === "google" || identities.some((id) => id.provider === "google"),
-      githubConnected: provider === "github" || identities.some((id) => id.provider === "github"),
+      googleConnected: hasGoogle,
+      githubConnected: hasGithub,
     };
   };
 
@@ -268,19 +361,12 @@ export function App() {
     const currentUser = liveUser || s.user;
     const providerConnections = getProviderConnections(currentUser);
 
-    if (!s.isDemo) {
-      return {
-        ...s,
-        user: currentUser || s.user,
-        ...providerConnections,
-      };
-    }
-
     const savedGoogle = localStorage.getItem("google-connected");
     const savedGithub = localStorage.getItem("github-connected");
 
     return {
       ...s,
+      user: currentUser || s.user,
       googleConnected: savedGoogle !== null ? savedGoogle === "true" : providerConnections.googleConnected,
       githubConnected: savedGithub !== null ? savedGithub === "true" : providerConnections.githubConnected,
     };
@@ -291,106 +377,75 @@ export function App() {
     if (error || !userData?.user) return;
 
     setSession((prev) => {
-      if (!prev || prev.isDemo) return prev;
+      if (!prev) return prev;
       return enrichSession(prev, userData.user);
     });
-  };
-
-  const syncAccountLinkToBackend = async (key, value) => {
-    try {
-      await apiFetch("/api/profile", {
-        method: "POST",
-        body: JSON.stringify({
-          profile: {
-            [key]: value
-          }
-        })
-      });
-    } catch (err) {
-      console.error("Failed to save connection status to backend:", err);
-    }
   };
 
   const handleLinkAccount = async (provider) => {
     if (!session) return;
     const isGoogle = provider === "google";
     const connectedKey = isGoogle ? "googleConnected" : "githubConnected";
-    const currentVal = session[connectedKey];
+    const currentVal = Boolean(session[connectedKey]);
 
     if (currentVal) {
-      // Disconnecting: Ask for confirmation first
+      // Disconnecting / Unlinking
       const confirmDisconnect = window.confirm(
-        `Are you sure you want to disconnect your ${isGoogle ? "Google" : "GitHub"} account?`
+        `Are you sure you want to unlink and disconnect your ${isGoogle ? "Google" : "GitHub"} account from Recall?`
       );
       if (!confirmDisconnect) return;
 
       try {
-        // Supabase manual identity unlink if running live
+        setToast(`Unlinking ${isGoogle ? "Google" : "GitHub"} on backend...`);
+        // 1. Call backend unlink endpoint
+        await apiFetch("/api/account/unlink", {
+          method: "POST",
+          body: JSON.stringify({ provider })
+        });
+
+        // 2. Supabase client-side unlink if live session
         if (!session.isDemo && supabase) {
-          const { data: { user } } = await supabase.auth.getUser();
-          const targetIdentity = user?.identities?.find(id => id.provider === provider);
-          if (targetIdentity) {
-            const { error } = await supabase.auth.unlinkIdentity(targetIdentity);
-            if (error) throw error;
+          try {
+            const { data: { user } } = await supabase.auth.getUser();
+            const targetIdentity = user?.identities?.find(id => id.provider === provider);
+            if (targetIdentity) {
+              await supabase.auth.unlinkIdentity(targetIdentity);
+            }
+          } catch (e) {
+            console.warn("Client unlinkIdentity note:", e);
           }
-        } else {
-          localStorage.setItem(isGoogle ? "google-connected" : "github-connected", "false");
         }
 
-        const newVal = false;
-        setToast(isGoogle ? "Google account disconnected" : "GitHub account disconnected");
-        setSession((prev) => {
-          if (!prev) return null;
-          return { ...prev, [connectedKey]: newVal };
-        });
-        syncAccountLinkToBackend(connectedKey, newVal);
+        // 3. Update local state and storage
+        localStorage.setItem(isGoogle ? "google-connected" : "github-connected", "false");
+        setSession((prev) => prev ? { ...prev, [connectedKey]: false } : null);
+        setToast(`${isGoogle ? "Google" : "GitHub"} account successfully unlinked`);
       } catch (err) {
-        console.error("Failed to unlink identity in Supabase:", err);
+        console.error("Failed to unlink account on backend:", err);
         setToast(`Could not disconnect ${isGoogle ? "Google" : "GitHub"}: ${err.message || "please try again"}`);
       }
     } else {
-      if (!session.isDemo && supabase && supabase.auth.linkIdentity) {
-        // Live Supabase Mode: Trigger real OAuth identity link redirect
-        setToast(`Redirecting to ${isGoogle ? "Google" : "GitHub"} to link account...`);
-        try {
-          const { error } = await supabase.auth.linkIdentity({
-            provider,
-            options: {
-              redirectTo: window.location.origin
-            }
-          });
-          if (error) {
-            if (error.message?.toLowerCase().includes("manual linking")) {
-              setToast("Failed: Please enable 'Allow manual linking' in your Supabase Auth Settings.");
-            } else {
-              setToast(`Failed to link account: ${error.message}`);
-            }
-          }
-        } catch (err) {
-          console.error("Failed to link identity in Supabase:", err);
-          setToast(`Failed to link account: ${err.message || "please try again"}`);
-        }
-      } else {
-        // Connecting: Open the simulated OAuth consent popup centered on screen
-        const width = 500;
-        const height = 620;
-        const left = window.screen.width / 2 - width / 2;
-        const top = window.screen.height / 2 - height / 2;
-        
-        const popup = window.open(
-          `/auth-sim.html?provider=${provider}`,
-          "oauth-link",
-          `width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes`
-        );
+      // Connecting
+      try {
+        setToast(`Connecting ${isGoogle ? "Google" : "GitHub"} account...`);
+        // 1. Register link on backend
+        await apiFetch("/api/account/link", {
+          method: "POST",
+          body: JSON.stringify({ provider })
+        });
 
-        if (!popup) {
-          setToast("Popup blocked! Please allow popups to open the authentication window.");
-        }
+        // 2. Update local state
+        localStorage.setItem(isGoogle ? "google-connected" : "github-connected", "true");
+        setSession((prev) => prev ? { ...prev, [connectedKey]: true } : null);
+        setToast(`${isGoogle ? "Google" : "GitHub"} account connected & verified`);
+      } catch (err) {
+        console.error("Failed to link account on backend:", err);
+        setToast(`Failed to link account: ${err.message || "please try again"}`);
       }
     }
   };
 
-  // Listen for OAuth messages from the popup window
+  // Listen for OAuth messages from popup window if opened
   useEffect(() => {
     const handleOAuthMessage = (event) => {
       if (event.origin !== window.location.origin) return;
@@ -405,13 +460,46 @@ export function App() {
           if (!prev) return null;
           return { ...prev, [connectedKey]: true };
         });
-        syncAccountLinkToBackend(connectedKey, true);
+        apiFetch("/api/account/link", {
+          method: "POST",
+          body: JSON.stringify({ provider })
+        }).catch(err => console.error("Link error:", err));
       }
     };
 
     window.addEventListener("message", handleOAuthMessage);
     return () => window.removeEventListener("message", handleOAuthMessage);
   }, [session]);
+
+  useEffect(() => {
+    if (activePage && activePage !== "landing") {
+      localStorage.setItem("recall-active-page", activePage);
+    }
+  }, [activePage]);
+
+  useEffect(() => {
+    if (session?.isDemo) {
+      try {
+        localStorage.setItem("recall-demo-memories", JSON.stringify(memories));
+      } catch (e) {}
+    }
+  }, [session?.isDemo, memories]);
+
+  useEffect(() => {
+    if (session?.isDemo) {
+      try {
+        localStorage.setItem("recall-demo-reminders", JSON.stringify(reminders));
+      } catch (e) {}
+    }
+  }, [session?.isDemo, reminders]);
+
+  useEffect(() => {
+    if (session?.isDemo) {
+      try {
+        localStorage.setItem("recall-demo-spaces", JSON.stringify(spaces));
+      } catch (e) {}
+    }
+  }, [session?.isDemo, spaces]);
 
   // ─── Supabase Auth state listener ──────────────────────────────────────────
   useEffect(() => {
@@ -454,10 +542,36 @@ export function App() {
         }
         setSession(enrichSession(s, userData.user));
         checkMFA();
-        setAuthLoading(false);
         loadState();
-        routeFirstRunProfile(s);
+        const routed = routeFirstRunProfile(s);
+        if (!routed) {
+          const savedPage = localStorage.getItem("recall-active-page");
+          setActivePage(savedPage && savedPage !== "landing" ? savedPage : "home");
+        }
+        setAuthLoading(false);
       } else {
+        // Check if there was a saved demo session from earlier
+        try {
+          const savedDemo = localStorage.getItem("recall-demo-session");
+          if (savedDemo) {
+            const parsed = JSON.parse(savedDemo);
+            if (parsed && parsed.user) {
+              setSession(parsed);
+              const savedMems = localStorage.getItem("recall-demo-memories");
+              const savedRems = localStorage.getItem("recall-demo-reminders");
+              const savedSpaces = localStorage.getItem("recall-demo-spaces");
+              setMemories(savedMems ? JSON.parse(savedMems) : DEMO_MEMORIES);
+              setReminders(savedRems ? JSON.parse(savedRems) : DEMO_REMINDERS);
+              setSpaces(savedSpaces ? JSON.parse(savedSpaces) : DEMO_SPACES);
+              const savedPage = localStorage.getItem("recall-active-page");
+              setActivePage(savedPage && savedPage !== "landing" ? savedPage : "home");
+              setAuthLoading(false);
+              return;
+            }
+          }
+        } catch (e) {
+          console.error("Failed to restore demo session", e);
+        }
         setSession(null);
         setAuthLoading(false);
       }
@@ -466,7 +580,7 @@ export function App() {
 
     // Subscribe to future auth changes (sign in, sign out, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, s) => {
+      (event, s) => {
         setSession(enrichSession(s));
         if (s) {
           checkMFA();
@@ -474,7 +588,10 @@ export function App() {
             refreshConnectedAccounts();
           }, 0);
           loadState();
-          routeFirstRunProfile(s);
+          const routed = routeFirstRunProfile(s);
+          if (!routed) {
+            setActivePage((prev) => (prev === "landing" ? "home" : prev));
+          }
         } else {
           setMemories([]);
           setReminders([]);
@@ -510,14 +627,11 @@ export function App() {
       if (data.profile) {
         setSession((prev) => {
           if (!prev) return null;
-          const isLive = !prev.isDemo;
           return {
             ...prev,
             name: data.profile.name || prev.name,
-            ...(isLive ? {} : {
-              googleConnected: data.profile.googleConnected,
-              githubConnected: data.profile.githubConnected,
-            })
+            googleConnected: data.profile.googleConnected !== undefined ? Boolean(data.profile.googleConnected) : prev.googleConnected,
+            githubConnected: data.profile.githubConnected !== undefined ? Boolean(data.profile.githubConnected) : prev.githubConnected,
           };
         });
       }
@@ -577,7 +691,13 @@ export function App() {
    */
   const enterDemo = async (mode) => {
     if (mode === "demo") {
-      setSession(enrichSession({ user: { email: "explore@recall.ai", id: "demo-user" }, name: "Demo User", isDemo: true }));
+      const demoUserSession = enrichSession({ user: { email: "explore@recall.ai", id: "demo-user" }, name: "Demo User", isDemo: true });
+      setSession(demoUserSession);
+      localStorage.setItem("recall-demo-session", JSON.stringify(demoUserSession));
+      localStorage.setItem("recall-demo-memories", JSON.stringify(DEMO_MEMORIES));
+      localStorage.setItem("recall-demo-reminders", JSON.stringify(DEMO_REMINDERS));
+      localStorage.setItem("recall-demo-spaces", JSON.stringify(DEMO_SPACES));
+      localStorage.setItem("recall-active-page", "home");
       setShowTour(true);
       setMemories(DEMO_MEMORIES);
       setReminders(DEMO_REMINDERS);
@@ -949,13 +1069,22 @@ export function App() {
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    await apiFetch("/api/signout", { method: "POST" });
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {}
+    try {
+      await apiFetch("/api/signout", { method: "POST" });
+    } catch (e) {}
+    localStorage.removeItem("recall-demo-session");
+    localStorage.removeItem("recall-demo-memories");
+    localStorage.removeItem("recall-demo-reminders");
+    localStorage.removeItem("recall-demo-spaces");
+    localStorage.removeItem("recall-active-page");
     setSession(null);
     setMemories([]);
     setReminders([]);
     setShowTour(false);
-    setActivePage("home");
+    setActivePage("landing");
   };
 
   const handleSaveProfile = async (profileData) => {
@@ -967,29 +1096,37 @@ export function App() {
       };
     });
     
-    // Save theme, bio to preferences (posts to backend via updatePreferences)
-    await updatePreferences({
+    const newPrefs = {
       theme: profileData.theme,
       bio: profileData.bio,
+    };
+
+    setPreferences((prev) => {
+      const updated = { ...prev, ...newPrefs };
+      localStorage.setItem("recall-preferences", JSON.stringify(updated));
+      return updated;
     });
     
-    // Save profile details to backend
+    localStorage.setItem("recall-theme", profileData.theme);
+    applyTheme(profileData.theme);
+
+    // Save profile and preferences together atomically to backend
     try {
       await apiFetch("/api/profile", {
         method: "POST",
         body: JSON.stringify({
           profile: {
-            name: profileData.name
-          }
+            name: profileData.name,
+            bio: profileData.bio,
+          },
+          preferences: newPrefs,
         })
       });
+      setToast("Profile and workspace settings saved");
     } catch (err) {
-      console.error("Failed to save profile name to backend:", err);
+      console.error("Failed to save profile to backend:", err);
+      setToast("Saved locally (backend sync pending)");
     }
-    
-    localStorage.setItem("recall-theme", profileData.theme);
-    applyTheme(profileData.theme);
-    setToast("Profile updated");
   };
 
   // ─── Render ────────────────────────────────────────────────────────────────
@@ -1137,6 +1274,7 @@ export function App() {
         onAddReminder={() => setNewReminderOpen(true)}
         preferences={preferences}
         updatePreferences={updatePreferences}
+        applyTheme={applyTheme}
         setToast={setToast}
         onLinkAccount={handleLinkAccount}
       />

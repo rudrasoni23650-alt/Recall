@@ -1,11 +1,48 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <script>
+      (function () {
+        try {
+          var nativeFetch = window.fetch;
+          var currentFetch = typeof nativeFetch === "function" ? function () {
+            return nativeFetch.apply(this === window || !this ? window : this, arguments);
+          } : nativeFetch;
+
+          var defineFetchProperty = function (obj) {
+            try {
+              Object.defineProperty(obj, "fetch", {
+                get: function () {
+                  return currentFetch;
+                },
+                set: function (fn) {
+                  currentFetch = fn;
+                },
+                configurable: true,
+                enumerable: true,
+              });
+            } catch (err) {}
+          };
+
+          defineFetchProperty(window);
+          if (typeof Window !== "undefined" && Window.prototype) {
+            defineFetchProperty(Window.prototype);
+          }
+        } catch (e) {}
+      })();
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0d4b4d" />
-    <meta name="description" content="Recall returns your saved thoughts when they matter." />
+    <meta name="description" content="An AI-assisted second-memory MVP that returns your saved thoughts when they matter." />
+    <meta property="og:title" content="Recall" />
+    <meta property="og:description" content="An AI-assisted second-memory MVP that returns your saved thoughts when they matter." />
     <title>Recall</title>
+    <link rel="icon" type="image/png" sizes="192x192" href="/favicon.png" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="preload" href="/hero-notebook-poster.webp" as="image" type="image/webp" fetchpriority="high">
+    <link rel="preload" href="/hero-notebook-animation.mp4" as="video" type="video/mp4">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Urbanist:wght@500;600;700;800;900&family=Poppins:wght@500;600;700;800;900&display=swap" rel="stylesheet">

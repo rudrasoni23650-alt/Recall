@@ -6,14 +6,11 @@ export default defineConfig({
     include: ["react", "react-dom/client"],
   },
   server: {
+    host: "0.0.0.0",
+    port: 3000,
+    allowedHosts: true,
     warmup: {
       clientFiles: ["./src/main.jsx"],
-    },
-    proxy: {
-      "/api": {
-        target: "http://localhost:5001",
-        changeOrigin: true,
-      },
     },
   },
   plugins: [react()],

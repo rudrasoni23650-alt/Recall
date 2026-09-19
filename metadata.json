@@ -1,0 +1,6 @@
+{
+  "name": "Recall",
+  "description": "An AI-assisted second-memory MVP that returns your saved thoughts when they matter.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

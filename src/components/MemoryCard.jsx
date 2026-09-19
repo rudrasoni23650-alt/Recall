@@ -138,13 +138,13 @@ export function MemoryCard({ memory, onSelect, onEdit, variant = "library", cont
             width: "32px", 
             height: "32px", 
             borderRadius: "50%", 
-            background: "#ffffff", 
+            background: "var(--surface, #ffffff)", 
             display: "flex", 
             alignItems: "center", 
             justifyContent: "center",
-            color: "var(--petrol)",
+            color: "var(--ink, var(--petrol))",
             zIndex: 10,
-            border: "1px solid rgba(21, 63, 64, 0.15)",
+            border: "1px solid var(--line)",
             boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
             cursor: "pointer"
           }}
